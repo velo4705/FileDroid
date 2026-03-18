@@ -16,7 +16,8 @@ import com.filedroid.data.Protocol
 fun ProfileEditSheet(
     profile: ConnectionProfile?,
     onSave: (label: String, protocol: Protocol, host: String, port: Int,
-             username: String, password: String, initialPath: String, anonymous: Boolean) -> Unit,
+             username: String, password: String, initialPath: String, anonymous: Boolean,
+             usePrivateKey: Boolean, privateKey: String, passphrase: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var label by remember { mutableStateOf(profile?.label ?: "") }
@@ -27,6 +28,10 @@ fun ProfileEditSheet(
     var password by remember { mutableStateOf("") }
     var initialPath by remember { mutableStateOf(profile?.initialRemotePath ?: "/") }
     var anonymous by remember { mutableStateOf(profile?.anonymous ?: false) }
+    // R2.8 — private-key auth (SFTP only)
+    var usePrivateKey by remember { mutableStateOf(profile?.usePrivateKey ?: false) }
+    var privateKey by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf("") }
 
     val portError = port.toIntOrNull()?.let { if (it in 1..65535) null else "Invalid port" } ?: "Invalid port"
     val canSave = label.isNotBlank() && host.isNotBlank() && portError == null &&
@@ -55,6 +60,7 @@ fun ProfileEditSheet(
                         onClick = {
                             protocol = p
                             port = when (p) { Protocol.SFTP -> "22"; Protocol.FTP -> "21"; Protocol.FTPS -> "990" }
+                            if (p != Protocol.SFTP) usePrivateKey = false
                         },
                         label = { Text(p.name) }
                     )
@@ -77,9 +83,37 @@ fun ProfileEditSheet(
             if (!anonymous) {
                 OutlinedTextField(value = username, onValueChange = { username = it },
                     label = { Text("Username") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(value = password, onValueChange = { password = it },
-                    label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+
+                // R2.8 — private-key toggle (SFTP only)
+                if (protocol == Protocol.SFTP) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Checkbox(checked = usePrivateKey, onCheckedChange = { usePrivateKey = it })
+                        Text("Use private key authentication")
+                    }
+                }
+
+                if (protocol == Protocol.SFTP && usePrivateKey) {
+                    OutlinedTextField(
+                        value = privateKey,
+                        onValueChange = { privateKey = it },
+                        label = { Text("Private key (PEM / OpenSSH)") },
+                        placeholder = { Text("-----BEGIN OPENSSH PRIVATE KEY-----") },
+                        modifier = Modifier.fillMaxWidth().height(140.dp),
+                        maxLines = 8
+                    )
+                    OutlinedTextField(
+                        value = passphrase,
+                        onValueChange = { passphrase = it },
+                        label = { Text("Key passphrase (optional)") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                } else if (!anonymous) {
+                    OutlinedTextField(value = password, onValueChange = { password = it },
+                        label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(), singleLine = true)
+                }
             }
 
             OutlinedTextField(value = initialPath, onValueChange = { initialPath = it },
@@ -87,7 +121,8 @@ fun ProfileEditSheet(
 
             Button(
                 onClick = {
-                    onSave(label, protocol, host, port.toInt(), username, password, initialPath, anonymous)
+                    onSave(label, protocol, host, port.toInt(), username, password,
+                        initialPath, anonymous, usePrivateKey, privateKey, passphrase)
                 },
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth()

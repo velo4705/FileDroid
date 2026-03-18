@@ -67,9 +67,10 @@ fun ProfileListScreen(
     if (showAddSheet) {
         ProfileEditSheet(
             profile = null,
-            onSave = { label, protocol, host, port, user, pass, path, anon ->
+            onSave = { label, protocol, host, port, user, pass, path, anon, useKey, key, phrase ->
                 viewModel.save(label = label, protocol = protocol, host = host, port = port,
-                    username = user, password = pass, initialPath = path, anonymous = anon)
+                    username = user, password = pass, initialPath = path, anonymous = anon,
+                    usePrivateKey = useKey, privateKey = key, passphrase = phrase)
                 showAddSheet = false
             },
             onDismiss = { showAddSheet = false }

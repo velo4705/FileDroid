@@ -6,8 +6,10 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
+import net.schmizz.sshj.userauth.keyprovider.KeyProvider
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.StringReader
 import javax.inject.Inject
 
 class SftpClient @Inject constructor() : RemoteClient {
@@ -27,6 +29,34 @@ class SftpClient @Inject constructor() : RemoteClient {
                 ssh = client
             }
         }
+
+    /**
+     * R2.8 — authenticate with a PEM/OpenSSH private key instead of a password.
+     * [privateKeyPem] is the raw key text (RSA/EC/Ed25519 PEM or OpenSSH format).
+     * [passphrase] is optional if the key is encrypted.
+     */
+    suspend fun connectWithKey(
+        host: String,
+        port: Int,
+        username: String,
+        privateKeyPem: String,
+        passphrase: String? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching<Unit> {
+            val client = SSHClient()
+            client.addHostKeyVerifier(PromiscuousVerifier())
+            client.connectTimeout = 10_000
+            client.connect(host, port)
+            val keyProvider: KeyProvider = if (passphrase.isNullOrEmpty()) {
+                client.loadKeys(StringReader(privateKeyPem), null as CharArray?)
+            } else {
+                client.loadKeys(StringReader(privateKeyPem), passphrase.toCharArray())
+            }
+            client.authPublickey(username, keyProvider)
+            sftp = client.newSFTPClient()
+            ssh = client
+        }
+    }
 
     override suspend fun connectAnonymous(host: String, port: Int): Result<Unit> =
         Result.failure(UnsupportedOperationException("SFTP does not support anonymous connections"))

@@ -10,5 +10,7 @@ data class ServerConfig(
     val sftpEnabled: Boolean = false,
     val anonymousEnabled: Boolean = false,
     val maxSessions: Int = 5,
-    val idleTimeoutSeconds: Int = 300
+    val idleTimeoutSeconds: Int = 300,
+    /** R7.4 — IP address of the interface to bind to. Empty string = bind to all interfaces (0.0.0.0). */
+    val bindAddress: String = ""
 )

@@ -29,7 +29,10 @@ class ProfileListViewModel @Inject constructor(
         username: String,
         password: String,
         initialPath: String,
-        anonymous: Boolean
+        anonymous: Boolean,
+        usePrivateKey: Boolean = false,
+        privateKey: String = "",
+        passphrase: String = ""
     ) {
         viewModelScope.launch {
             repo.save(
@@ -37,9 +40,10 @@ class ProfileListViewModel @Inject constructor(
                     id = id, label = label, protocol = protocol,
                     host = host, port = port, username = username,
                     credentialKey = "", initialRemotePath = initialPath,
-                    anonymous = anonymous
+                    anonymous = anonymous, usePrivateKey = usePrivateKey
                 ),
-                password
+                // Store private key as credential if provided, otherwise password
+                if (usePrivateKey && privateKey.isNotBlank()) privateKey else password
             )
         }
     }

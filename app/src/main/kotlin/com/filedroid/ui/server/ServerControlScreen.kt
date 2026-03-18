@@ -55,7 +55,7 @@ fun ServerControlScreen(
                 }
             }
 
-            // Protocol toggles (only when stopped)
+            // Protocol toggles + interface picker (only when stopped)
             if (!anyRunning) {
                 Text("Enable protocols:", style = MaterialTheme.typography.labelMedium)
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -65,6 +65,17 @@ fun ServerControlScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = sftpChecked, onCheckedChange = { sftpChecked = it })
                     Text("SFTP  (port ${uiState.sftpPort})")
+                }
+
+                // R7.4 — network interface picker
+                if (uiState.availableInterfaces.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Bind to interface:", style = MaterialTheme.typography.labelMedium)
+                    InterfacePicker(
+                        interfaces = uiState.availableInterfaces,
+                        selected = uiState.bindAddress,
+                        onSelect = { viewModel.setBindAddress(it) }
+                    )
                 }
             }
 
@@ -90,6 +101,43 @@ fun ServerControlScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Start Servers")
                 }
+            }
+        }
+    }
+}
+
+/** R7.4 — dropdown to pick a network interface or "All interfaces". */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InterfacePicker(
+    interfaces: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val allLabel = "All interfaces (0.0.0.0)"
+    val displayLabel = if (selected.isBlank()) allLabel
+    else interfaces.firstOrNull { it.second == selected }?.first ?: selected
+
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = displayLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Network interface") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(allLabel) },
+                onClick = { onSelect(""); expanded = false }
+            )
+            interfaces.forEach { (label, ip) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = { onSelect(ip); expanded = false }
+                )
             }
         }
     }

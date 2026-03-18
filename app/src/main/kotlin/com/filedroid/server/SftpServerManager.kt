@@ -1,6 +1,7 @@
 package com.filedroid.server
 
 import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
+import org.apache.sshd.common.keyprovider.KeyPairProvider
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
@@ -19,8 +20,17 @@ class SftpServerManager @Inject constructor() {
         val sshd = SshServer.setUpDefaultServer()
         sshd.port = config.sftpPort
 
-        // Host key
-        sshd.keyPairProvider = SimpleGeneratorHostKeyProvider(hostKeyFile.toPath())
+        // R7.4 — bind to selected network interface (empty = all interfaces)
+        if (config.bindAddress.isNotBlank()) {
+            sshd.host = config.bindAddress
+        }
+
+        // R7.2 — enforce minimum 2048-bit RSA host key
+        val keyProvider = SimpleGeneratorHostKeyProvider(hostKeyFile.toPath()).apply {
+            algorithm = KeyPairProvider.SSH_RSA
+            keySize = 2048  // minimum; existing keys ≥2048 are reused as-is
+        }
+        sshd.keyPairProvider = keyProvider
 
         // Password auth
         sshd.passwordAuthenticator = PasswordAuthenticator { username, password, _ ->

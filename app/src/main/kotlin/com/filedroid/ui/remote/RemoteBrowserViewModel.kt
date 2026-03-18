@@ -65,11 +65,17 @@ class RemoteBrowserViewModel @Inject constructor(
                 Protocol.FTP -> FtpClient()
                 Protocol.FTPS -> FtpClient().also { it.useFtps() }
             }
-            val result = if (profile.anonymous) {
-                remoteClient.connectAnonymous(profile.host, profile.port)
-            } else {
-                val password = profileRepo.getPassword(profile) ?: ""
-                remoteClient.connect(profile.host, profile.port, profile.username, password)
+            val result = when {
+                profile.anonymous -> remoteClient.connectAnonymous(profile.host, profile.port)
+                // R2.8 — private-key auth for SFTP
+                profile.usePrivateKey && remoteClient is SftpClient -> {
+                    val privateKey = profileRepo.getPassword(profile) ?: ""
+                    remoteClient.connectWithKey(profile.host, profile.port, profile.username, privateKey)
+                }
+                else -> {
+                    val password = profileRepo.getPassword(profile) ?: ""
+                    remoteClient.connect(profile.host, profile.port, profile.username, password)
+                }
             }
             result.fold(
                 onSuccess = {

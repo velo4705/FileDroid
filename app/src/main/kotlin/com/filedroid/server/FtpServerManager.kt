@@ -43,6 +43,10 @@ class FtpServerManager @Inject constructor() {
         // Listener
         val listenerFactory = ListenerFactory()
         listenerFactory.port = config.ftpPort
+        // R7.4 — bind to selected network interface
+        if (config.bindAddress.isNotBlank()) {
+            listenerFactory.serverAddress = java.net.InetSocketAddress(config.bindAddress, config.ftpPort)
+        }
         factory.addListener("default", listenerFactory.createListener())
 
         // User manager

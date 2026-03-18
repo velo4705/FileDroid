@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.net.NetworkInterface
 import javax.inject.Inject
 
 data class ServerUiState(
@@ -22,7 +23,11 @@ data class ServerUiState(
     val ftpPort: Int = 2121,
     val sftpPort: Int = 2222,
     val rootPath: String = "",
-    val localIp: String = ""
+    val localIp: String = "",
+    /** R7.4 — available network interfaces (display name to IP address) */
+    val availableInterfaces: List<Pair<String, String>> = emptyList(),
+    /** R7.4 — selected bind address; empty = all interfaces */
+    val bindAddress: String = ""
 )
 
 @HiltViewModel
@@ -36,7 +41,9 @@ class ServerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ServerUiState(
         ftpPort = credentialStore.getString(CredentialKeys.FTP_PORT)?.toIntOrNull() ?: 2121,
         sftpPort = credentialStore.getString(CredentialKeys.SFTP_PORT)?.toIntOrNull() ?: 2222,
-        rootPath = credentialStore.getString("root_path") ?: ""
+        rootPath = credentialStore.getString("root_path") ?: "",
+        availableInterfaces = loadNetworkInterfaces(),
+        bindAddress = credentialStore.getString("bind_address") ?: ""
     ))
     val uiState: StateFlow<ServerUiState> = _uiState.asStateFlow()
 
@@ -52,7 +59,19 @@ class ServerViewModel @Inject constructor(
     }
 
     fun refresh() {
-        _uiState.update { it.copy(ftpRunning = ftpManager.isRunning(), sftpRunning = sftpManager.isRunning()) }
+        _uiState.update {
+            it.copy(
+                ftpRunning = ftpManager.isRunning(),
+                sftpRunning = sftpManager.isRunning(),
+                availableInterfaces = loadNetworkInterfaces()
+            )
+        }
+    }
+
+    /** R7.4 — persist and apply selected bind address */
+    fun setBindAddress(address: String) {
+        credentialStore.putString("bind_address", address)
+        _uiState.update { it.copy(bindAddress = address) }
     }
 
     private fun buildConfig(ftpEnabled: Boolean, sftpEnabled: Boolean) = ServerConfig(
@@ -62,6 +81,20 @@ class ServerViewModel @Inject constructor(
         username = credentialStore.getString("server_username") ?: "",
         password = credentialStore.getString(CredentialKeys.SERVER_PASSWORD) ?: "",
         ftpEnabled = ftpEnabled,
-        sftpEnabled = sftpEnabled
+        sftpEnabled = sftpEnabled,
+        bindAddress = _uiState.value.bindAddress
     )
+
+    companion object {
+        /** Returns list of (label, ipAddress) for all up non-loopback IPv4 interfaces. */
+        fun loadNetworkInterfaces(): List<Pair<String, String>> = runCatching {
+            NetworkInterface.getNetworkInterfaces()?.toList()
+                ?.filter { it.isUp && !it.isLoopback }
+                ?.flatMap { iface ->
+                    iface.inetAddresses.toList()
+                        .filter { addr -> addr is java.net.Inet4Address }
+                        .map { addr -> "${iface.displayName} (${addr.hostAddress})" to addr.hostAddress!! }
+                } ?: emptyList()
+        }.getOrDefault(emptyList())
+    }
 }
