@@ -15,9 +15,9 @@ class FtpClient @Inject constructor() : RemoteClient {
 
     fun useFtps() { client = FTPSClient("TLS", false) }
 
-    override suspend fun connect(host: String, port: Int, username: String, password: String) =
+    override suspend fun connect(host: String, port: Int, username: String, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
-            runCatching {
+            runCatching<Unit> {
                 client.connect(host, port)
                 check(client.login(username, password)) { "Login failed" }
                 client.enterLocalPassiveMode()
@@ -25,51 +25,55 @@ class FtpClient @Inject constructor() : RemoteClient {
             }
         }
 
-    override suspend fun connectAnonymous(host: String, port: Int) =
+    override suspend fun connectAnonymous(host: String, port: Int): Result<Unit> =
         connect(host, port, "anonymous", "anonymous@")
 
-    override suspend fun listDirectory(path: String) = withContext(Dispatchers.IO) {
-        runCatching {
-            (client.listFiles(path) ?: emptyArray()).map { f ->
-                RemoteFile(
-                    name = f.name,
-                    path = "$path/${f.name}".replace("//", "/"),
-                    isDirectory = f.isDirectory,
-                    size = f.size,
-                    lastModified = f.timestamp?.timeInMillis ?: 0L
-                )
-            }.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
-        }
-    }
-
-    override suspend fun download(remotePath: String, out: OutputStream) =
+    override suspend fun listDirectory(path: String): Result<List<RemoteFile>> =
         withContext(Dispatchers.IO) {
             runCatching {
+                (client.listFiles(path) ?: emptyArray()).map { f ->
+                    RemoteFile(
+                        name = f.name,
+                        path = "$path/${f.name}".replace("//", "/"),
+                        isDirectory = f.isDirectory,
+                        size = f.size,
+                        lastModified = f.timestamp?.timeInMillis ?: 0L
+                    )
+                }.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
+            }
+        }
+
+    override suspend fun download(remotePath: String, out: OutputStream): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching<Unit> {
                 check(client.retrieveFile(remotePath, out)) { "Download failed: $remotePath" }
             }
         }
 
-    override suspend fun upload(inputStream: InputStream, remotePath: String) =
+    override suspend fun upload(inputStream: InputStream, remotePath: String): Result<Unit> =
         withContext(Dispatchers.IO) {
-            runCatching {
+            runCatching<Unit> {
                 check(client.storeFile(remotePath, inputStream)) { "Upload failed: $remotePath" }
             }
         }
 
-    override suspend fun createDirectory(path: String) = withContext(Dispatchers.IO) {
-        runCatching { check(client.makeDirectory(path)) { "mkdir failed: $path" } }
-    }
-
-    override suspend fun rename(from: String, to: String) = withContext(Dispatchers.IO) {
-        runCatching { check(client.rename(from, to)) { "Rename failed" } }
-    }
-
-    override suspend fun delete(path: String) = withContext(Dispatchers.IO) {
-        runCatching {
-            val deleted = client.deleteFile(path) || client.removeDirectory(path)
-            check(deleted) { "Delete failed: $path" }
+    override suspend fun createDirectory(path: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching<Unit> { check(client.makeDirectory(path)) { "mkdir failed: $path" } }
         }
-    }
+
+    override suspend fun rename(from: String, to: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching<Unit> { check(client.rename(from, to)) { "Rename failed" } }
+        }
+
+    override suspend fun delete(path: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching<Unit> {
+                val deleted = client.deleteFile(path) || client.removeDirectory(path)
+                check(deleted) { "Delete failed: $path" }
+            }
+        }
 
     override fun disconnect() { runCatching { client.logout(); client.disconnect() } }
     override fun isConnected(): Boolean = client.isConnected
