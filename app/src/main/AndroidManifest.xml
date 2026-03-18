@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -18,8 +19,7 @@
         android:allowBackup="true"
         android:label="FileDroid"
         android:supportsRtl="true"
-        android:theme="@style/Theme.FileDroid"
-        xmlns:tools="http://schemas.android.com/tools">
+        android:theme="@style/Theme.FileDroid">
 
         <activity
             android:name=".MainActivity"
