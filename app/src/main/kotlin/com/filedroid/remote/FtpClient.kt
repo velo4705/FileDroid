@@ -18,6 +18,8 @@ class FtpClient @Inject constructor() : RemoteClient {
     override suspend fun connect(host: String, port: Int, username: String, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching<Unit> {
+                client.connectTimeout = 10_000
+                client.defaultTimeout = 10_000
                 client.connect(host, port)
                 check(client.login(username, password)) { "Login failed" }
                 client.enterLocalPassiveMode()

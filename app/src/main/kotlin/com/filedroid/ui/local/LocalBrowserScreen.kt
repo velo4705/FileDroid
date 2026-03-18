@@ -1,6 +1,8 @@
 package com.filedroid.ui.local
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -15,6 +19,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,34 +40,57 @@ fun LocalBrowserScreen(
     viewModel: LocalBrowserViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val inSelectionMode = uiState.selectedPaths.isNotEmpty()
 
-    BackHandler { if (!viewModel.navigateUp()) onNavigateBack() }
+    BackHandler {
+        when {
+            inSelectionMode -> viewModel.clearSelection()
+            else -> if (!viewModel.navigateUp()) onNavigateBack()
+        }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    BreadcrumbRow(
-                        breadcrumbs = uiState.breadcrumbs,
-                        currentPath = uiState.currentPath
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { if (!viewModel.navigateUp()) onNavigateBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (uiState.termuxAvailable) {
-                        IconButton(onClick = { viewModel.navigateToTermux() }) {
-                            Icon(Icons.Default.Terminal, contentDescription = "Termux storage")
+            if (inSelectionMode) {
+                TopAppBar(
+                    title = { Text("${uiState.selectedPaths.size} selected") },
+                    navigationIcon = {
+                        IconButton(onClick = { viewModel.clearSelection() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel selection")
+                        }
+                    },
+                    actions = {
+                        // Upload button — caller must wire a RemoteClient; shown as placeholder
+                        IconButton(onClick = { /* upload wired via TransferEngine in dual-panel */ }) {
+                            Icon(Icons.Default.Upload, contentDescription = "Upload selected")
                         }
                     }
-                    IconButton(onClick = { viewModel.showCreateFolder() }) {
-                        Icon(Icons.Default.CreateNewFolder, contentDescription = "New folder")
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        BreadcrumbRow(
+                            breadcrumbs = uiState.breadcrumbs,
+                            currentPath = uiState.currentPath
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { if (!viewModel.navigateUp()) onNavigateBack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        if (uiState.termuxAvailable) {
+                            IconButton(onClick = { viewModel.navigateToTermux() }) {
+                                Icon(Icons.Default.Terminal, contentDescription = "Termux storage")
+                            }
+                        }
+                        IconButton(onClick = { viewModel.showCreateFolder() }) {
+                            Icon(Icons.Default.CreateNewFolder, contentDescription = "New folder")
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         snackbarHost = {
             uiState.error?.let { error ->
@@ -79,9 +107,12 @@ fun LocalBrowserScreen(
                 uiState.entries.isEmpty() -> EmptyFolder()
                 else -> FileList(
                     entries = uiState.entries,
+                    selectedPaths = uiState.selectedPaths,
                     onEntryClick = { file ->
-                        if (file.isDirectory) viewModel.navigateTo(file.file)
+                        if (inSelectionMode) viewModel.toggleSelection(file)
+                        else if (file.isDirectory) viewModel.navigateTo(file.file)
                     },
+                    onLongPress = { file -> viewModel.toggleSelection(file) },
                     onRename = { viewModel.showRename(it) },
                     onDelete = { viewModel.showDeleteConfirm(it) }
                 )
@@ -145,22 +176,34 @@ private fun BreadcrumbRow(breadcrumbs: List<String>, currentPath: String) {
 @Composable
 private fun FileList(
     entries: List<LocalFile>,
+    selectedPaths: Set<String>,
     onEntryClick: (LocalFile) -> Unit,
+    onLongPress: (LocalFile) -> Unit,
     onRename: (LocalFile) -> Unit,
     onDelete: (LocalFile) -> Unit
 ) {
     LazyColumn {
         items(entries, key = { it.path }) { file ->
-            FileRow(file = file, onClick = { onEntryClick(file) }, onRename = { onRename(file) }, onDelete = { onDelete(file) })
+            FileRow(
+                file = file,
+                isSelected = file.path in selectedPaths,
+                onClick = { onEntryClick(file) },
+                onLongPress = { onLongPress(file) },
+                onRename = { onRename(file) },
+                onDelete = { onDelete(file) }
+            )
             HorizontalDivider()
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FileRow(
     file: LocalFile,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
+    onLongPress: () -> Unit = {},
     onRename: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -169,16 +212,21 @@ private fun FileRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
-            contentDescription = null,
-            tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp)
-        )
+        if (isSelected) {
+            Icon(Icons.Default.CheckBox, contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+        } else {
+            Icon(
+                imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
+                contentDescription = null,
+                tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(file.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)

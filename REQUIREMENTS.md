@@ -55,8 +55,7 @@ FileDroid is a dual-panel file manager for Android, similar to FileZilla on desk
 2. SFTP server on configurable port (default 2222)
 3. Persistent notification with server status and local IP while running
 4. Restrict remote clients to configured shared root (Virtual_Filesystem)
-5. Block IP after 5 failed logins in 60 seconds (300s ban)
-6. Active and passive FTP transfer modes
+5. Active and passive FTP transfer modes
 7. Public-key auth for SFTP
 8. Update displayed IP within 5 seconds on network change
 

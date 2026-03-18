@@ -1,5 +1,6 @@
 package com.filedroid.ui.remote
 
+import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filedroid.data.ConnectionProfile
@@ -9,6 +10,7 @@ import com.filedroid.remote.FtpClient
 import com.filedroid.remote.RemoteClient
 import com.filedroid.remote.RemoteFile
 import com.filedroid.remote.SftpClient
+import com.filedroid.transfer.TransferEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 data class RemoteBrowserUiState(
@@ -28,12 +31,15 @@ data class RemoteBrowserUiState(
     val error: String? = null,
     val showRenameDialog: Boolean = false,
     val showDeleteConfirm: Boolean = false,
-    val selectedFile: RemoteFile? = null
+    val selectedFile: RemoteFile? = null,
+    val showReconnectPrompt: Boolean = false,
+    val downloadedToPath: String? = null  // non-null briefly after a download completes
 )
 
 @HiltViewModel
 class RemoteBrowserViewModel @Inject constructor(
-    private val profileRepo: ConnectionProfileRepository
+    private val profileRepo: ConnectionProfileRepository,
+    private val transferEngine: TransferEngine
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RemoteBrowserUiState())
@@ -79,9 +85,20 @@ class RemoteBrowserViewModel @Inject constructor(
     }
 
     fun navigateTo(path: String) {
+        // R7.5 — reject path traversal
+        if (path.contains("..")) {
+            _uiState.update { it.copy(error = "Access denied: invalid path") }
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            client?.listDirectory(path)?.fold(
+            val result = client?.listDirectory(path)
+            if (result == null) {
+                // client gone — prompt reconnect
+                _uiState.update { it.copy(isLoading = false, showReconnectPrompt = true) }
+                return@launch
+            }
+            result.fold(
                 onSuccess = { entries ->
                     backStack.addLast(path)
                     _uiState.update {
@@ -89,7 +106,13 @@ class RemoteBrowserViewModel @Inject constructor(
                     }
                 },
                 onFailure = { e ->
-                    _uiState.update { it.copy(isLoading = false, error = e.message) }
+                    val msg = e.message ?: "Unknown error"
+                    val dropped = msg.contains("broken pipe", ignoreCase = true) ||
+                            msg.contains("connection", ignoreCase = true)
+                    _uiState.update {
+                        it.copy(isLoading = false, error = msg,
+                            showReconnectPrompt = dropped && it.isConnected)
+                    }
                 }
             )
         }
@@ -136,12 +159,31 @@ class RemoteBrowserViewModel @Inject constructor(
         }
     }
 
+    fun download(file: RemoteFile) {
+        val c = client ?: return
+        val destDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val localPath = File(destDir, file.name).absolutePath
+        transferEngine.enqueueDownload(c, file.path, localPath, file.size)
+        _uiState.update { it.copy(downloadedToPath = localPath) }
+    }
+
+    fun clearDownloadedToast() = _uiState.update { it.copy(downloadedToPath = null) }
+
+    fun dismissReconnectPrompt() = _uiState.update { it.copy(showReconnectPrompt = false) }
+
+    fun reconnect() {
+        val profile = _uiState.value.profile ?: return
+        _uiState.update { it.copy(showReconnectPrompt = false) }
+        connect(profile)
+    }
+
     fun showRename(file: RemoteFile) = _uiState.update { it.copy(showRenameDialog = true, selectedFile = file) }
     fun showDeleteConfirm(file: RemoteFile) = _uiState.update { it.copy(showDeleteConfirm = true, selectedFile = file) }
     fun dismissDialogs() = _uiState.update { it.copy(showRenameDialog = false, showDeleteConfirm = false, selectedFile = null) }
     fun clearError() = _uiState.update { it.copy(error = null) }
 
-    fun disconnect() { client?.disconnect(); client = null; backStack.clear()
+    fun disconnect() {
+        client?.disconnect(); client = null; backStack.clear()
         _uiState.update { RemoteBrowserUiState() }
     }
 

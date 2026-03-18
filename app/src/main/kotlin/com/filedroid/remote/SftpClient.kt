@@ -20,6 +20,7 @@ class SftpClient @Inject constructor() : RemoteClient {
             runCatching<Unit> {
                 val client = SSHClient()
                 client.addHostKeyVerifier(PromiscuousVerifier())
+                client.connectTimeout = 10_000
                 client.connect(host, port)
                 client.authPassword(username, password)
                 sftp = client.newSFTPClient()

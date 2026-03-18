@@ -112,6 +112,7 @@ fun RemoteBrowserScreen(
                                     onClick = {
                                         if (file.isDirectory) viewModel.navigateTo(file.path)
                                     },
+                                    onDownload = { viewModel.download(file) },
                                     onRename = { viewModel.showRename(file) },
                                     onDelete = { viewModel.showDeleteConfirm(file) }
                                 )
@@ -129,7 +130,33 @@ fun RemoteBrowserScreen(
                     action = { TextButton(onClick = { viewModel.clearError() }) { Text("Dismiss") } }
                 ) { Text(uiState.error ?: "") }
             }
+
+            // Download queued toast
+            if (uiState.downloadedToPath != null) {
+                LaunchedEffect(uiState.downloadedToPath) {
+                    kotlinx.coroutines.delay(2500)
+                    viewModel.clearDownloadedToast()
+                }
+                Snackbar(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+                ) { Text("Download queued → Downloads/") }
+            }
         }
+    }
+
+    // Reconnect prompt (R2.7)
+    if (uiState.showReconnectPrompt) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissReconnectPrompt() },
+            title = { Text("Connection lost") },
+            text = { Text("The connection to ${uiState.profile?.host} was dropped. Reconnect?") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.reconnect() }) { Text("Reconnect") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissReconnectPrompt() }) { Text("Dismiss") }
+            }
+        )
     }
 
     // Rename dialog
@@ -190,6 +217,7 @@ fun RemoteBrowserScreen(
 private fun RemoteFileRow(
     file: RemoteFile,
     onClick: () -> Unit,
+    onDownload: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -217,6 +245,10 @@ private fun RemoteFileRow(
                 Icon(Icons.Default.MoreVert, contentDescription = "Options")
             }
             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                if (!file.isDirectory) {
+                    DropdownMenuItem(text = { Text("Download") }, onClick = { showMenu = false; onDownload() },
+                        leadingIcon = { Icon(Icons.Default.Download, null) })
+                }
                 DropdownMenuItem(text = { Text("Rename") }, onClick = { showMenu = false; onRename() },
                     leadingIcon = { Icon(Icons.Default.Edit, null) })
                 DropdownMenuItem(text = { Text("Delete") }, onClick = { showMenu = false; onDelete() },

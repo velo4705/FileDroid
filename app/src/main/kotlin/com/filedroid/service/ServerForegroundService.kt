@@ -6,6 +6,10 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.filedroid.MainActivity
@@ -14,6 +18,8 @@ import com.filedroid.server.ServerConfig
 import com.filedroid.server.SftpServerManager
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -21,6 +27,13 @@ class ServerForegroundService : Service() {
 
     @Inject lateinit var ftpManager: FtpServerManager
     @Inject lateinit var sftpManager: SftpServerManager
+
+    private var activeConfig: ServerConfig? = null
+    private var connectivityManager: ConnectivityManager? = null
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) = updateNotification()
+        override fun onLost(network: Network) = updateNotification()
+    }
 
     companion object {
         const val ACTION_START = "com.filedroid.START_SERVER"
@@ -44,6 +57,11 @@ class ServerForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        connectivityManager = getSystemService(ConnectivityManager::class.java)
+        val req = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .build()
+        connectivityManager?.registerNetworkCallback(req, networkCallback)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -58,28 +76,43 @@ class ServerForegroundService : Service() {
     }
 
     private fun startServers(config: ServerConfig) {
-        val active = mutableListOf<String>()
-        if (config.ftpEnabled) {
-            ftpManager.start(config).onSuccess { active.add("FTP :${config.ftpPort}") }
-        }
+        activeConfig = config
+        if (config.ftpEnabled) ftpManager.start(config)
         if (config.sftpEnabled) {
             val keyFile = File(filesDir, "host_key.ser")
-            sftpManager.start(config, keyFile).onSuccess { active.add("SFTP :${config.sftpPort}") }
+            sftpManager.start(config, keyFile)
         }
-        val label = if (active.isEmpty()) "No servers running" else active.joinToString(" | ")
-        startForeground(NOTIF_ID, buildNotification(label))
+        startForeground(NOTIF_ID, buildNotification(config))
     }
 
     private fun stopServers() {
         ftpManager.stop()
         sftpManager.stop()
+        activeConfig = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
+    private fun updateNotification() {
+        val config = activeConfig ?: return
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.notify(NOTIF_ID, buildNotification(config))
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        runCatching { connectivityManager?.unregisterNetworkCallback(networkCallback) }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun buildNotification(statusText: String) =
+    private fun buildNotification(config: ServerConfig) = run {
+        val ip = getLocalIpAddress() ?: "unknown IP"
+        val parts = mutableListOf<String>()
+        if (config.ftpEnabled) parts.add("FTP $ip:${config.ftpPort}")
+        if (config.sftpEnabled) parts.add("SFTP $ip:${config.sftpPort}")
+        val statusText = if (parts.isEmpty()) "No servers running" else parts.joinToString("  |  ")
+
         NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_upload)
             .setContentTitle("FileDroid Server")
@@ -93,6 +126,7 @@ class ServerForegroundService : Service() {
                 )
             )
             .build()
+    }
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
@@ -101,9 +135,16 @@ class ServerForegroundService : Service() {
         ).apply { description = "FTP/SFTP server status" }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
+
+    private fun getLocalIpAddress(): String? = runCatching {
+        NetworkInterface.getNetworkInterfaces().asSequence()
+            .flatMap { it.inetAddresses.asSequence() }
+            .firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
+            ?.hostAddress
+    }.getOrNull()
 }
 
-// Minimal Bundle helpers to pass ServerConfig via Intent extras
+// Bundle helpers
 private fun ServerConfig.toBundle() = android.os.Bundle().apply {
     putInt("ftpPort", ftpPort); putInt("sftpPort", sftpPort)
     putString("rootPath", rootPath); putString("username", username)

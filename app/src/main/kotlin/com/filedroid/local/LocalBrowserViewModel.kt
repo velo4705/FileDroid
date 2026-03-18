@@ -22,7 +22,8 @@ data class LocalBrowserUiState(
     val showCreateFolderDialog: Boolean = false,
     val showRenameDialog: Boolean = false,
     val showDeleteConfirm: Boolean = false,
-    val selectedFile: LocalFile? = null
+    val selectedFile: LocalFile? = null,
+    val selectedPaths: Set<String> = emptySet()  // multi-select (R1.4)
 )
 
 @HiltViewModel
@@ -116,6 +117,22 @@ class LocalBrowserViewModel @Inject constructor(
         it.copy(showCreateFolderDialog = false, showRenameDialog = false, showDeleteConfirm = false, selectedFile = null)
     }
     fun clearError() = _uiState.update { it.copy(error = null) }
+
+    // Multi-select (R1.4)
+    fun toggleSelection(file: LocalFile) {
+        _uiState.update { state ->
+            val current = state.selectedPaths.toMutableSet()
+            if (file.path in current) current.remove(file.path) else current.add(file.path)
+            state.copy(selectedPaths = current)
+        }
+    }
+
+    fun clearSelection() = _uiState.update { it.copy(selectedPaths = emptySet()) }
+
+    fun getSelectedFiles(): List<LocalFile> {
+        val paths = _uiState.value.selectedPaths
+        return _uiState.value.entries.filter { it.path in paths }
+    }
 
     private fun refresh() = navigateTo(File(_uiState.value.currentPath))
 

@@ -2,21 +2,35 @@ package com.filedroid.server
 
 import org.apache.ftpserver.FtpServerFactory
 import org.apache.ftpserver.ftplet.Authority
-import org.apache.ftpserver.ftplet.FtpFile
-import org.apache.ftpserver.ftplet.FtpFileSystemView
-import org.apache.ftpserver.ftplet.User
+import org.apache.ftpserver.ftplet.DefaultFtpReply
+import org.apache.ftpserver.ftplet.FtpException
+import org.apache.ftpserver.ftplet.FtpRequest
+import org.apache.ftpserver.ftplet.FtpSession
+import org.apache.ftpserver.ftplet.FtpletResult
+import org.apache.ftpserver.ftplet.DefaultFtplet
 import org.apache.ftpserver.listener.ListenerFactory
 import org.apache.ftpserver.usermanager.impl.BaseUser
 import org.apache.ftpserver.usermanager.impl.ConcurrentLoginPermission
 import org.apache.ftpserver.usermanager.impl.TransferRatePermission
 import org.apache.ftpserver.usermanager.impl.WritePermission
-import org.apache.ftpserver.ftplet.FtpException
-import org.apache.ftpserver.usermanager.impl.PropertiesUserManager
 import org.apache.ftpserver.filesystem.nativefs.NativeFileSystemFactory
 import org.apache.ftpserver.FtpServer
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/** Rejects any command whose argument contains path traversal sequences (R7.5). */
+private class PathTraversalGuard : DefaultFtplet() {
+    private fun isSafe(path: String?) = path == null || !path.contains("..")
+
+    override fun beforeCommand(session: FtpSession, request: FtpRequest): FtpletResult {
+        if (!isSafe(request.argument)) {
+            session.write(DefaultFtpReply(550, "Permission denied: invalid path"))
+            return FtpletResult.SKIP
+        }
+        return FtpletResult.DEFAULT
+    }
+}
 
 @Singleton
 class FtpServerManager @Inject constructor() {
@@ -59,6 +73,9 @@ class FtpServerManager @Inject constructor() {
 
         // Native filesystem rooted at config.rootPath
         factory.fileSystem = NativeFileSystemFactory()
+
+        // Path traversal guard (R7.5)
+        factory.ftplets = linkedMapOf("guard" to PathTraversalGuard())
 
         server = factory.createServer()
         server!!.start()
