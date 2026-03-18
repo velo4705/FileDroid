@@ -74,7 +74,7 @@ class FtpServerManager @Inject constructor() {
 
         // Path traversal guard (R7.5)
         @Suppress("UNCHECKED_CAST")
-        factory.ftplets = linkedMapOf("guard" to PathTraversalGuard()) as java.util.Map<String, org.apache.ftpserver.ftplet.Ftplet>
+        factory.ftplets = mutableMapOf<String, org.apache.ftpserver.ftplet.Ftplet>("guard" to PathTraversalGuard())
 
         server = factory.createServer()
         server!!.start()
