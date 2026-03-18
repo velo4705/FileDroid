@@ -47,3 +47,4 @@ folding, DI, nav, CI | ✅ Done |
 
 - Android 8.0 (API 26) or higher
 - Wi-Fi or Ethernet connection for server/client features
+ 
