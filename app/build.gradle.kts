@@ -73,6 +73,15 @@ dependencies {
     // Security
     implementation(libs.security.crypto)
 
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    kapt(libs.room.compiler)
+
+    // Networking — FTP + SFTP client
+    implementation(libs.commons.net)
+    implementation(libs.sshj)
+
     // Unit tests
     testImplementation(libs.kotest.runner)
     testImplementation(libs.kotest.property)

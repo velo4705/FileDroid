@@ -8,6 +8,9 @@ navigationCompose = "2.7.7"
 activityCompose = "1.9.0"
 lifecycleViewmodelCompose = "2.8.1"
 securityCrypto = "1.1.0-alpha06"
+room = "2.6.1"
+commonsNet = "3.10.0"
+sshj = "0.38.0"
 kotest = "5.9.1"
 robolectric = "4.12.2"
 mockk = "1.13.11"
@@ -34,6 +37,15 @@ hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-com
 
 # Security
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+
+# Room
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+# Networking
+commons-net = { group = "commons-net", name = "commons-net", version.ref = "commonsNet" }
+sshj = { group = "com.hierynomus", name = "sshj", version.ref = "sshj" }
 
 # Testing
 kotest-runner = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }

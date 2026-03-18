@@ -1,6 +1,9 @@
 package com.filedroid.di
 
 import android.content.Context
+import androidx.room.Room
+import com.filedroid.data.AppDatabase
+import com.filedroid.data.ConnectionProfileDao
 import com.filedroid.permission.PermissionManager
 import com.filedroid.permission.PermissionManagerImpl
 import com.filedroid.security.CredentialStore
@@ -16,13 +19,18 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideCredentialStore(@ApplicationContext ctx: Context): CredentialStore =
         CredentialStoreImpl(ctx)
 
-    @Provides
-    @Singleton
-    fun providePermissionManager(): PermissionManager =
-        PermissionManagerImpl()
+    @Provides @Singleton
+    fun providePermissionManager(): PermissionManager = PermissionManagerImpl()
+
+    @Provides @Singleton
+    fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
+        Room.databaseBuilder(ctx, AppDatabase::class.java, "filedroid.db").build()
+
+    @Provides @Singleton
+    fun provideConnectionProfileDao(db: AppDatabase): ConnectionProfileDao =
+        db.connectionProfileDao()
 }
