@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.filedroid.ui.home.HomeScreen
+import com.filedroid.ui.local.LocalBrowserScreen
 import com.filedroid.ui.settings.FtpSettingsScreen
 import com.filedroid.ui.settings.SettingsScreen
 import com.filedroid.ui.settings.SftpSettingsScreen
@@ -13,6 +14,7 @@ import com.filedroid.ui.theme.FileDroidTheme
 
 object Routes {
     const val HOME = "home"
+    const val LOCAL_BROWSER = "local_browser"
     const val SETTINGS = "settings"
     const val SETTINGS_FTP = "settings/ftp"
     const val SETTINGS_SFTP = "settings/sftp"
@@ -34,8 +36,12 @@ fun NavGraph(navController: NavHostController) {
     ) {
         composable(Routes.HOME) {
             HomeScreen(
-                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToLocalBrowser = { navController.navigate(Routes.LOCAL_BROWSER) }
             )
+        }
+        composable(Routes.LOCAL_BROWSER) {
+            LocalBrowserScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(

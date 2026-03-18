@@ -2,6 +2,7 @@ package com.filedroid.ui.home
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -16,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun HomeScreen(
     onNavigateToSettings: () -> Unit,
+    onNavigateToLocalBrowser: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -40,17 +42,27 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = "Server Status",
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            // Browse local files
             Button(
-                onClick = { /* start server — wired in Milestone 2 */ },
-                enabled = uiState.canStartServer
+                onClick = onNavigateToLocalBrowser,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Folder, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Browse Files")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Start server (enabled only when credentials + permission are set)
+            Button(
+                onClick = { /* wired in Milestone 5 */ },
+                enabled = uiState.canStartServer,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Start Server")
             }
+
             if (!uiState.canStartServer) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
