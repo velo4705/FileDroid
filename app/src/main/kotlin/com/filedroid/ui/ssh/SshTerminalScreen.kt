@@ -33,10 +33,23 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun SshTerminalScreen(
     onNavigateBack: () -> Unit,
+    initialHost: String = "",
+    initialPort: Int = 22,
+    initialUsername: String = "",
+    initialPassword: String = "",
     viewModel: SshTerminalViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showConnectDialog by remember { mutableStateOf(uiState.tabs.isEmpty()) }
+    var showConnectDialog by remember { mutableStateOf(false) }
+
+    // Auto-connect if launched from a profile
+    LaunchedEffect(initialHost) {
+        if (initialHost.isNotBlank() && uiState.tabs.isEmpty()) {
+            viewModel.openSession(initialHost, initialPort, initialUsername, initialPassword)
+        } else if (uiState.tabs.isEmpty()) {
+            showConnectDialog = true
+        }
+    }
 
     Scaffold(
         topBar = {

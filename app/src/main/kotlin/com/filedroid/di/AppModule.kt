@@ -28,9 +28,15 @@ object AppModule {
 
     @Provides @Singleton
     fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
-        Room.databaseBuilder(ctx, AppDatabase::class.java, "filedroid.db").build()
+        Room.databaseBuilder(ctx, AppDatabase::class.java, "filedroid.db")
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides @Singleton
     fun provideConnectionProfileDao(db: AppDatabase): ConnectionProfileDao =
         db.connectionProfileDao()
+
+    @Provides @Singleton
+    fun provideSshProfileDao(db: AppDatabase): SshProfileDao =
+        db.sshProfileDao()
 }

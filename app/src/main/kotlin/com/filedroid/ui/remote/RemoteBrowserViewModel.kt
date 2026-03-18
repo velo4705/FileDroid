@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class RemoteBrowserUiState(
+    val profile: ConnectionProfile? = null,
     val isConnected: Boolean = false,
     val isConnecting: Boolean = false,
     val currentPath: String = "/",
@@ -41,9 +42,18 @@ class RemoteBrowserViewModel @Inject constructor(
     private var client: RemoteClient? = null
     private val backStack = ArrayDeque<String>()
 
+    /** Load profile by ID then connect. */
+    fun loadAndConnect(profileId: Long) {
+        viewModelScope.launch {
+            val profile = profileRepo.getById(profileId) ?: return@launch
+            _uiState.update { it.copy(profile = profile) }
+            connect(profile)
+        }
+    }
+
     fun connect(profile: ConnectionProfile) {
         viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isConnecting = true, error = null) }
+            _uiState.update { it.copy(isConnecting = true, error = null, profile = profile) }
             val remoteClient: RemoteClient = when (profile.protocol) {
                 Protocol.SFTP -> SftpClient()
                 Protocol.FTP -> FtpClient()

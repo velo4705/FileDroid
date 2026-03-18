@@ -10,8 +10,13 @@ class ProtocolConverter {
     @TypeConverter fun toProtocol(s: String): Protocol = Protocol.valueOf(s)
 }
 
-@Database(entities = [ConnectionProfile::class], version = 1, exportSchema = false)
+@Database(
+    entities = [ConnectionProfile::class, SshProfile::class],
+    version = 2,
+    exportSchema = false
+)
 @TypeConverters(ProtocolConverter::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun connectionProfileDao(): ConnectionProfileDao
+    abstract fun sshProfileDao(): SshProfileDao
 }
