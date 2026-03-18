@@ -82,6 +82,11 @@ dependencies {
     implementation(libs.commons.net)
     implementation(libs.sshj)
 
+    // Server — Apache MINA SSHD + Apache FTP Server
+    implementation(libs.mina.sshd.core)
+    implementation(libs.mina.sshd.sftp)
+    implementation(libs.ftpserver.core)
+
     // Unit tests
     testImplementation(libs.kotest.runner)
     testImplementation(libs.kotest.property)

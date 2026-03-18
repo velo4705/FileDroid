@@ -12,6 +12,8 @@ import com.filedroid.ui.settings.FtpSettingsScreen
 import com.filedroid.ui.settings.SettingsScreen
 import com.filedroid.ui.settings.SftpSettingsScreen
 import com.filedroid.ui.theme.FileDroidTheme
+import com.filedroid.ui.server.ServerControlScreen
+import com.filedroid.ui.ssh.SshTerminalScreen
 import com.filedroid.ui.transfer.TransferQueueScreen
 
 object Routes {
@@ -19,6 +21,8 @@ object Routes {
     const val LOCAL_BROWSER = "local_browser"
     const val PROFILES = "profiles"
     const val TRANSFERS = "transfers"
+    const val SERVER = "server"
+    const val SSH = "ssh"
     const val SETTINGS = "settings"
     const val SETTINGS_FTP = "settings/ftp"
     const val SETTINGS_SFTP = "settings/sftp"
@@ -43,7 +47,9 @@ fun NavGraph(navController: NavHostController) {
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToLocalBrowser = { navController.navigate(Routes.LOCAL_BROWSER) },
                 onNavigateToProfiles = { navController.navigate(Routes.PROFILES) },
-                onNavigateToTransfers = { navController.navigate(Routes.TRANSFERS) }
+                onNavigateToTransfers = { navController.navigate(Routes.TRANSFERS) },
+                onNavigateToServer = { navController.navigate(Routes.SERVER) },
+                onNavigateToSsh = { navController.navigate(Routes.SSH) }
             )
         }
         composable(Routes.LOCAL_BROWSER) {
@@ -58,6 +64,12 @@ fun NavGraph(navController: NavHostController) {
         }
         composable(Routes.TRANSFERS) {
             TransferQueueScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Routes.SERVER) {
+            ServerControlScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Routes.SSH) {
+            SshTerminalScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(

@@ -11,6 +11,8 @@ securityCrypto = "1.1.0-alpha06"
 room = "2.6.1"
 commonsNet = "3.10.0"
 sshj = "0.38.0"
+minaSshd = "2.13.0"
+ftpServer = "1.1.1"
 kotest = "5.9.1"
 robolectric = "4.12.2"
 mockk = "1.13.11"
@@ -46,6 +48,9 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 # Networking
 commons-net = { group = "commons-net", name = "commons-net", version.ref = "commonsNet" }
 sshj = { group = "com.hierynomus", name = "sshj", version.ref = "sshj" }
+mina-sshd-core = { group = "org.apache.sshd", name = "sshd-core", version.ref = "minaSshd" }
+mina-sshd-sftp = { group = "org.apache.sshd", name = "sshd-sftp", version.ref = "minaSshd" }
+ftpserver-core = { group = "org.apache.ftpserver", name = "ftpserver-core", version.ref = "ftpServer" }
 
 # Testing
 kotest-runner = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }

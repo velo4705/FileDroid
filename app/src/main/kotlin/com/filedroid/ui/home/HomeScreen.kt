@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -22,6 +23,8 @@ fun HomeScreen(
     onNavigateToLocalBrowser: () -> Unit,
     onNavigateToProfiles: () -> Unit,
     onNavigateToTransfers: () -> Unit,
+    onNavigateToServer: () -> Unit,
+    onNavigateToSsh: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -78,11 +81,22 @@ fun HomeScreen(
                 Text("Transfers")
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onNavigateToSsh,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Terminal, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("SSH Manager")
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // Start server (enabled only when credentials + permission are set)
             Button(
-                onClick = { /* wired in Milestone 5 */ },
+                onClick = onNavigateToServer,
                 enabled = uiState.canStartServer,
                 modifier = Modifier.fillMaxWidth()
             ) {
