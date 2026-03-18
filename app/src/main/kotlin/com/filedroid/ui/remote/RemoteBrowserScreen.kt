@@ -79,7 +79,7 @@ fun RemoteBrowserScreen(
                     ) {
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Connecting to ${profile.host}…")
+                        Text("Connecting to ${profile?.host ?: "…"}…")
                     }
                 }
                 uiState.error != null && !uiState.isConnected -> {

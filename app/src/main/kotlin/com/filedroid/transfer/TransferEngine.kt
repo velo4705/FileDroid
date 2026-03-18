@@ -75,7 +75,7 @@ class TransferEngine @Inject constructor() {
                 runUpload(job, client)
             }
             result.fold(
-                onSuccess = { updateJob(job.id) { it.copy(status = TransferStatus.DONE, progressFraction = 1f) } },
+                onSuccess = { updateJob(job.id) { it.copy(status = TransferStatus.DONE, transferredBytes = it.totalBytes) } },
                 onFailure = { e ->
                     if (e is CancellationException) {
                         updateJob(job.id) { it.copy(status = TransferStatus.CANCELLED) }
@@ -116,10 +116,6 @@ class TransferEngine @Inject constructor() {
     private fun updateJob(id: String, transform: (TransferJob) -> TransferJob) {
         _jobs.update { list -> list.map { if (it.id == id) transform(it) else it } }
     }
-
-    // Extension to allow copy with progressFraction (derived field workaround)
-    private fun TransferJob.copy(progressFraction: Float) =
-        copy(transferredBytes = (progressFraction * totalBytes).toLong())
 }
 
 /** Wraps an OutputStream and reports progress. */

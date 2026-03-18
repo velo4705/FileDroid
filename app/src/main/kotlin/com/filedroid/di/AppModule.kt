@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.filedroid.data.AppDatabase
 import com.filedroid.data.ConnectionProfileDao
+import com.filedroid.data.SshProfileDao
 import com.filedroid.permission.PermissionManager
 import com.filedroid.permission.PermissionManagerImpl
 import com.filedroid.security.CredentialStore

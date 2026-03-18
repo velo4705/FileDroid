@@ -51,7 +51,6 @@ class FtpServerManager @Inject constructor() {
             name = config.username
             password = config.password
             homeDirectory = config.rootPath
-            isEnabled = true
             authorities = buildList<Authority> {
                 add(WritePermission())
                 add(ConcurrentLoginPermission(config.maxSessions, config.maxSessions))
@@ -65,7 +64,6 @@ class FtpServerManager @Inject constructor() {
                 name = "anonymous"
                 password = ""
                 homeDirectory = config.rootPath
-                isEnabled = true
                 authorities = listOf(ConcurrentLoginPermission(config.maxSessions, config.maxSessions))
             }
             userManager.save(anon)
@@ -75,7 +73,8 @@ class FtpServerManager @Inject constructor() {
         factory.fileSystem = NativeFileSystemFactory()
 
         // Path traversal guard (R7.5)
-        factory.ftplets = linkedMapOf("guard" to PathTraversalGuard())
+        @Suppress("UNCHECKED_CAST")
+        factory.ftplets = linkedMapOf("guard" to PathTraversalGuard()) as java.util.Map<String, org.apache.ftpserver.ftplet.Ftplet>
 
         server = factory.createServer()
         server!!.start()
