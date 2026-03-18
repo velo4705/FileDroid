@@ -15,7 +15,6 @@ class SettingsViewModelTest : FunSpec({
 
     fun buildViewModel(): SettingsViewModel {
         val store = mockk<CredentialStore>(relaxed = true)
-        every { store.getString(any()) } returns null
         val permManager = mockk<PermissionManager>(relaxed = true)
         return SettingsViewModel(store, permManager)
     }
