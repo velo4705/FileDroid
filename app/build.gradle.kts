@@ -21,7 +21,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = if (System.getenv("KEYSTORE_BASE64") != null) {
+            signingConfig = if (System.getenv("KEYSTORE_BASE64")?.isNotBlank() == true) {
                 signingConfigs.create("release") {
                     val keystoreFile = rootProject.file("release.keystore")
                     storeFile = keystoreFile
