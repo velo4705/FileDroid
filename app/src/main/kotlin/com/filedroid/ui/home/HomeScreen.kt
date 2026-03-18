@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,6 +21,7 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToLocalBrowser: () -> Unit,
     onNavigateToProfiles: () -> Unit,
+    onNavigateToTransfers: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -63,6 +65,17 @@ fun HomeScreen(
                 Icon(Icons.Default.CloudQueue, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Connect to Remote")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onNavigateToTransfers,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.SwapVert, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Transfers")
             }
 
             Spacer(modifier = Modifier.height(16.dp))

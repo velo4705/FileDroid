@@ -12,11 +12,13 @@ import com.filedroid.ui.settings.FtpSettingsScreen
 import com.filedroid.ui.settings.SettingsScreen
 import com.filedroid.ui.settings.SftpSettingsScreen
 import com.filedroid.ui.theme.FileDroidTheme
+import com.filedroid.ui.transfer.TransferQueueScreen
 
 object Routes {
     const val HOME = "home"
     const val LOCAL_BROWSER = "local_browser"
     const val PROFILES = "profiles"
+    const val TRANSFERS = "transfers"
     const val SETTINGS = "settings"
     const val SETTINGS_FTP = "settings/ftp"
     const val SETTINGS_SFTP = "settings/sftp"
@@ -40,7 +42,8 @@ fun NavGraph(navController: NavHostController) {
             HomeScreen(
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToLocalBrowser = { navController.navigate(Routes.LOCAL_BROWSER) },
-                onNavigateToProfiles = { navController.navigate(Routes.PROFILES) }
+                onNavigateToProfiles = { navController.navigate(Routes.PROFILES) },
+                onNavigateToTransfers = { navController.navigate(Routes.TRANSFERS) }
             )
         }
         composable(Routes.LOCAL_BROWSER) {
@@ -52,6 +55,9 @@ fun NavGraph(navController: NavHostController) {
                 onConnect = { navController.navigate("${Routes.PROFILES}/$it") },
                 onEdit = { navController.navigate("${Routes.PROFILES}/$it/edit") }
             )
+        }
+        composable(Routes.TRANSFERS) {
+            TransferQueueScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
