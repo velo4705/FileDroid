@@ -45,7 +45,7 @@ class FtpServerManager @Inject constructor() {
         listenerFactory.port = config.ftpPort
         // R7.4 — bind to selected network interface
         if (config.bindAddress.isNotBlank()) {
-            listenerFactory.serverAddress = java.net.InetSocketAddress(config.bindAddress, config.ftpPort)
+            listenerFactory.serverAddress = config.bindAddress
         }
         factory.addListener("default", listenerFactory.createListener())
 

@@ -9,7 +9,6 @@ import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.userauth.keyprovider.KeyProvider
 import java.io.InputStream
 import java.io.OutputStream
-import java.io.StringReader
 import javax.inject.Inject
 
 class SftpClient @Inject constructor() : RemoteClient {
@@ -43,18 +42,24 @@ class SftpClient @Inject constructor() : RemoteClient {
         passphrase: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching<Unit> {
+            // SSHJ loadKeys requires a file path, so write to a temp file
+            val keyFile = java.io.File.createTempFile("sshj_key_", null).apply {
+                writeText(privateKeyPem)
+                deleteOnExit()
+            }
             val client = SSHClient()
             client.addHostKeyVerifier(PromiscuousVerifier())
             client.connectTimeout = 10_000
             client.connect(host, port)
             val keyProvider: KeyProvider = if (passphrase.isNullOrEmpty()) {
-                client.loadKeys(StringReader(privateKeyPem), null as CharArray?)
+                client.loadKeys(keyFile.absolutePath)
             } else {
-                client.loadKeys(StringReader(privateKeyPem), passphrase.toCharArray())
+                client.loadKeys(keyFile.absolutePath, passphrase)
             }
             client.authPublickey(username, keyProvider)
             sftp = client.newSFTPClient()
             ssh = client
+            keyFile.delete()
         }
     }
 
