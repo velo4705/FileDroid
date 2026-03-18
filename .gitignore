@@ -2,14 +2,34 @@
 .gradle/
 build/
 !gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
 
-# Android Studio
+# Android build outputs
+app/build/
+*.apk
+*.aab
+*.ap_
+
+# Android Studio / IntelliJ
 *.iml
 .idea/
 local.properties
+*.orig
 
-# Build outputs
-app/build/
+# Signing
+release.keystore
+*.jks
+*.keystore
 
 # OS
 .DS_Store
+Thumbs.db
+
+# Kotlin
+*.class
+
+# Logs
+*.log
+
+# Test results
+app/src/test/results/
