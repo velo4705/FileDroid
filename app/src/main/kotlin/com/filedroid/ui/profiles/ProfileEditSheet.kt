@@ -33,7 +33,11 @@ fun ProfileEditSheet(
     var privateKey by remember { mutableStateOf("") }
     var passphrase by remember { mutableStateOf("") }
 
-    val portError = port.toIntOrNull()?.let { if (it in 1..65535) null else "Invalid port" } ?: "Invalid port"
+    val portError: String? = when (val n = port.toIntOrNull()) {
+        null -> "Invalid port"
+        in 1..65535 -> null
+        else -> "Invalid port"
+    }
     val canSave = label.isNotBlank() && host.isNotBlank() && portError == null &&
             (anonymous || username.isNotBlank())
 

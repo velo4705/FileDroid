@@ -123,7 +123,11 @@ private fun SshProfileEditSheet(
     var username by remember { mutableStateOf(profile?.username ?: "") }
     var password by remember { mutableStateOf("") }
 
-    val portError = port.toIntOrNull()?.let { if (it in 1..65535) null else "Invalid port" } ?: "Invalid port"
+    val portError: String? = when (val n = port.toIntOrNull()) {
+        null -> "Invalid port"
+        in 1..65535 -> null
+        else -> "Invalid port"
+    }
     val canSave = label.isNotBlank() && host.isNotBlank() && portError == null && username.isNotBlank()
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
