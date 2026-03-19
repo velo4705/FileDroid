@@ -6,12 +6,8 @@ import io.kotest.matchers.shouldBe
 
 class PortValidationTest : FunSpec({
 
-    test("1023 is invalid (below range)") {
-        isValidPort("1023") shouldBe false
-    }
-
-    test("1024 is valid (lower boundary)") {
-        isValidPort("1024") shouldBe true
+    test("1 is valid (lower boundary)") {
+        isValidPort("1") shouldBe true
     }
 
     test("65535 is valid (upper boundary)") {
@@ -40,6 +36,22 @@ class PortValidationTest : FunSpec({
 
     test("0 is invalid") {
         isValidPort("0") shouldBe false
+    }
+
+    test("1 is valid (lower boundary)") {
+        isValidPort("1") shouldBe true
+    }
+
+    test("1023 is valid") {
+        isValidPort("1023") shouldBe true
+    }
+
+    test("21 is valid (standard FTP port)") {
+        isValidPort("21") shouldBe true
+    }
+
+    test("22 is valid (standard SFTP port)") {
+        isValidPort("22") shouldBe true
     }
 
     test("negative number is invalid") {

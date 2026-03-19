@@ -12,20 +12,17 @@ import io.kotest.property.checkAll
 
 class PortValidationPropertyTest : FunSpec({
 
-    test("Property 5: isValidPort returns true iff integer is in [1024, 65535]") {
+    test("Property 5: isValidPort returns true iff integer is in [1, 65535]") {
         checkAll(iterations = 1000, Arb.int()) { n ->
-            isValidPort(n.toString()) shouldBe (n in 1024..65535)
+            isValidPort(n.toString()) shouldBe (n in 1..65535)
         }
     }
 
     test("Property 5: isValidPort returns false for non-numeric strings") {
-        // Filter out strings that happen to be valid integers
         checkAll(iterations = 500, Arb.string()) { s ->
-            val isNumericInRange = s.toIntOrNull()?.let { it in 1024..65535 } ?: false
+            val isNumericInRange = s.toIntOrNull()?.let { it in 1..65535 } ?: false
             if (!isNumericInRange) {
-                // Either non-numeric or numeric but out of range — both should return false
-                // unless the string is a valid in-range integer
-                val expected = s.toIntOrNull()?.let { it in 1024..65535 } ?: false
+                val expected = s.toIntOrNull()?.let { it in 1..65535 } ?: false
                 isValidPort(s) shouldBe expected
             }
         }

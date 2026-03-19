@@ -23,20 +23,20 @@ class SettingsViewModelTest : FunSpec({
 
     test("entering invalid FTP port '999' sets ftpPortError") {
         val vm = buildViewModel()
-        vm.updateFtpPort("999")
+        vm.updateFtpPort("0")
         vm.uiState.value.ftpPortError shouldNotBe null
     }
 
     test("entering valid FTP port '8080' clears ftpPortError") {
         val vm = buildViewModel()
-        vm.updateFtpPort("999")   // set error first
+        vm.updateFtpPort("0")     // set error first
         vm.updateFtpPort("8080")  // then clear it
         vm.uiState.value.ftpPortError shouldBe null
     }
 
-    test("entering boundary FTP port '1024' clears ftpPortError") {
+    test("entering boundary FTP port '1' clears ftpPortError") {
         val vm = buildViewModel()
-        vm.updateFtpPort("1024")
+        vm.updateFtpPort("1")
         vm.uiState.value.ftpPortError shouldBe null
     }
 
@@ -62,13 +62,13 @@ class SettingsViewModelTest : FunSpec({
 
     test("entering invalid SFTP port '999' sets sftpPortError") {
         val vm = buildViewModel()
-        vm.updateSftpPort("999")
+        vm.updateSftpPort("0")
         vm.uiState.value.sftpPortError shouldNotBe null
     }
 
     test("entering valid SFTP port '2222' clears sftpPortError") {
         val vm = buildViewModel()
-        vm.updateSftpPort("999")
+        vm.updateSftpPort("0")
         vm.updateSftpPort("2222")
         vm.uiState.value.sftpPortError shouldBe null
     }
@@ -76,12 +76,10 @@ class SettingsViewModelTest : FunSpec({
     // --- Property-based: error state matches validation ---
 
     test("ftpPortError is null iff port is in valid range (property)") {
-        // Feature: filedroid, Property 5 (SettingsViewModel): Port error state matches validation
         val vm = buildViewModel()
         checkAll(iterations = 500, Arb.int(-100, 70000)) { n ->
             vm.updateFtpPort(n.toString())
-            val expectedError = if (n in 1024..65535) null else "non-null"
-            if (n in 1024..65535) {
+            if (n in 1..65535) {
                 vm.uiState.value.ftpPortError shouldBe null
             } else {
                 vm.uiState.value.ftpPortError shouldNotBe null
