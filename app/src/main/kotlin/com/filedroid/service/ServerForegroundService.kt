@@ -113,8 +113,9 @@ class ServerForegroundService : Service() {
             if (resolved.sftpEnabled) {
                 val keyFile = File(filesDir, "host_key.ser")
                 sftpManager.start(resolved, keyFile).onFailure {
-                    updateNotificationError("SFTP failed: ${it.message}")
-                    if (!resolved.ftpEnabled || ftpManager.isRunning().not()) stopSelf()
+                    val msg = it.message ?: it.cause?.message ?: it::class.simpleName ?: "unknown error"
+                    updateNotificationError("SFTP failed: $msg")
+                    if (!resolved.ftpEnabled || !ftpManager.isRunning()) stopSelf()
                 }
             }
         }

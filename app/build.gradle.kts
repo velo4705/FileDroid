@@ -62,6 +62,8 @@ android {
                 "META-INF/*.RSA",
                 "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
             )
+            // Merge service loader files from all JARs (required for Apache MINA SSHD)
+            merges += "META-INF/services/**"
         }
     }
 

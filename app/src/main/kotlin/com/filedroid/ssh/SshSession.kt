@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.io.OutputStream
@@ -51,7 +52,9 @@ class SshSession(val id: String, val label: String) {
         client.authPassword(username, password)
 
         val sess = client.startSession()
-        sess.allocatePTY("xterm", 220, 50, 0, 0, emptyMap())
+        // Disable remote echo — we send full lines, so the PTY echoing chars back causes duplicates
+        val ptyModes = mutableMapOf<PTYMode, Int>(PTYMode.ECHO to 0)
+        sess.allocatePTY("xterm", 220, 50, 0, 0, ptyModes)
         val sh = sess.startShell()
 
         ssh = client
