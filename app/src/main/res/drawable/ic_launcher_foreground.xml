@@ -5,48 +5,48 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Folder body (forest green) -->
+    <!-- Folder body -->
     <path
         android:fillColor="#166534"
-        android:pathData="M10,54 Q10,46 20,46 L38,46 Q41,46 43,44 L46,41 Q48,39 52,39 L88,39 Q98,39 98,49 L98,84 Q98,92 88,92 L20,92 Q10,92 10,84 Z"/>
+        android:pathData="M14,58 Q14,52 20,52 L36,52 Q39,52 41,50 L43,48 Q45,46 48,46 L88,46 Q94,46 94,52 L94,84 Q94,90 88,90 L20,90 Q14,90 14,84 Z"/>
 
-    <!-- Folder tab highlight (lighter green) -->
+    <!-- Folder tab highlight -->
     <path
         android:fillColor="#16A34A"
-        android:pathData="M10,54 L98,54 L98,49 Q98,39 88,39 L52,39 Q48,39 46,41 L43,44 Q41,46 38,46 L20,46 Q10,46 10,54 Z"/>
+        android:pathData="M14,58 L94,58 L94,52 Q94,46 88,46 L48,46 Q45,46 43,48 L41,50 Q39,52 36,52 L20,52 Q14,52 14,58 Z"/>
 
-    <!-- UP arrow shaft (light mint) -->
+    <!-- UP arrow shaft (light mint) — x=38 -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#86EFAC"
-        android:strokeWidth="8"
+        android:strokeWidth="7"
         android:strokeLineCap="round"
-        android:pathData="M40,42 L40,18"/>
+        android:pathData="M38,46 L38,24"/>
 
     <!-- UP arrow head (light mint) -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#86EFAC"
-        android:strokeWidth="8"
+        android:strokeWidth="7"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M28,30 L40,16 L52,30"/>
+        android:pathData="M28,35 L38,22 L48,35"/>
 
-    <!-- DOWN arrow shaft (dark purple) -->
+    <!-- DOWN arrow shaft (dark purple) — x=70 -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#4C1D95"
-        android:strokeWidth="8"
+        android:strokeWidth="7"
         android:strokeLineCap="round"
-        android:pathData="M68,16 L68,40"/>
+        android:pathData="M70,22 L70,44"/>
 
     <!-- DOWN arrow head (dark purple) -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#4C1D95"
-        android:strokeWidth="8"
+        android:strokeWidth="7"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M56,28 L68,42 L80,28"/>
+        android:pathData="M60,33 L70,46 L80,33"/>
 
 </vector>
