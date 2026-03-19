@@ -1,6 +1,7 @@
 package com.filedroid.server
 
 import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
+import org.apache.sshd.common.file.root.RootedFileSystemProvider
 import org.apache.sshd.common.keyprovider.KeyPairProvider
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
@@ -50,6 +51,10 @@ class SftpServerManager @Inject constructor() {
         val rootNio = Paths.get(rootPath)
         sshd.fileSystemFactory = object : VirtualFileSystemFactory(rootNio) {
             override fun getUserHomeDir(session: org.apache.sshd.common.session.SessionContext): java.nio.file.Path = rootNio
+            override fun createFileSystem(session: org.apache.sshd.common.session.SessionContext): java.nio.file.FileSystem {
+                return org.apache.sshd.common.file.root.RootedFileSystemProvider()
+                    .newFileSystem(rootNio, emptyMap<String, Any>())
+            }
         }
 
         sshd.start()
