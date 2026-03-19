@@ -1,7 +1,7 @@
 # FileDroid
 
 <p align="center">
-  <img src="app/src/main/res/drawable/ic_launcher_foreground.xml" width="96" alt="FileDroid icon" />
+  <img src="https://img.shields.io/badge/%F0%9F%93%82-FileDroid-1565C0?style=for-the-badge" alt="FileDroid" />
 </p>
 
 <p align="center">

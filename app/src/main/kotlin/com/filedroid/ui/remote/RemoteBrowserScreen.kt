@@ -114,23 +114,43 @@ fun RemoteBrowserScreen(
                         }
                     },
                     actions = {
+                        var showMenu by remember { mutableStateOf(false) }
                         IconButton(onClick = { searchActive = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
-                        IconButton(onClick = { filePicker.launch("*/*") }) {
-                            Icon(Icons.Default.Upload, contentDescription = "Upload file")
-                        }
-                        IconButton(onClick = { folderPicker.launch(null) }) {
-                            Icon(Icons.Default.CreateNewFolder, contentDescription = "Upload folder")
-                        }
-                        IconButton(onClick = { showNewFolderDialog = true }) {
-                            Icon(Icons.Default.FolderOpen, contentDescription = "New folder")
-                        }
-                        IconButton(onClick = { showNewFileDialog = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "New file")
-                        }
-                        IconButton(onClick = { viewModel.navigateTo(uiState.currentPath) }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Box {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                            }
+                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Upload file") },
+                                    leadingIcon = { Icon(Icons.Default.Upload, null) },
+                                    onClick = { showMenu = false; filePicker.launch("*/*") }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Upload folder") },
+                                    leadingIcon = { Icon(Icons.Default.DriveFolderUpload, null) },
+                                    onClick = { showMenu = false; folderPicker.launch(null) }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("New file") },
+                                    leadingIcon = { Icon(Icons.Default.Add, null) },
+                                    onClick = { showMenu = false; showNewFileDialog = true }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("New folder") },
+                                    leadingIcon = { Icon(Icons.Default.CreateNewFolder, null) },
+                                    onClick = { showMenu = false; showNewFolderDialog = true }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Refresh") },
+                                    leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                                    onClick = { showMenu = false; viewModel.navigateTo(uiState.currentPath) }
+                                )
+                            }
                         }
                     }
                 )
