@@ -36,6 +36,8 @@ fun ServerControlScreen(
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     var pendingStart by remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -43,21 +45,15 @@ fun ServerControlScreen(
             pendingStart?.let { (ftp, sftp) -> viewModel.startServers(ftp, sftp) }
             pendingStart = null
         } else {
-            // Denied — check if permanently blocked (can't show dialog again)
             val activity = context as? android.app.Activity
             val canAskAgain = activity != null && ActivityCompat.shouldShowRequestPermissionRationale(
                 activity, Manifest.permission.POST_NOTIFICATIONS
             )
-            if (!canAskAgain) {
-                // Permanently denied — guide to Settings
-                showSettingsDialog = true
-            }
+            if (!canAskAgain) showSettingsDialog = true
             pendingStart = null
         }
     }
 
-    // Shown when permission is permanently denied — user must go to Settings
-    var showSettingsDialog by remember { mutableStateOf(false) }
     if (showSettingsDialog) {
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
