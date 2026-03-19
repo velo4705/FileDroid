@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <!-- Background -->
+  <rect width="108" height="108" rx="22" fill="#FDF6E4"/>
+
+  <!-- Folder body (forest green) -->
+  <path d="M10,54 Q10,46 20,46 L38,46 Q41,46 43,44 L46,41 Q48,39 52,39 L88,39 Q98,39 98,49 L98,84 Q98,92 88,92 L20,92 Q10,92 10,84 Z"
+        fill="#166534"/>
+
+  <!-- Folder tab highlight (lighter green) -->
+  <path d="M10,54 L98,54 L98,49 Q98,39 88,39 L52,39 Q48,39 46,41 L43,44 Q41,46 38,46 L20,46 Q10,46 10,54 Z"
+        fill="#16A34A"/>
+
+  <!-- UP arrow shaft (light mint) -->
+  <path d="M40,42 L40,18" stroke="#86EFAC" stroke-width="8" stroke-linecap="round"/>
+  <!-- UP arrow head (light mint) -->
+  <path d="M28,30 L40,16 L52,30" fill="none" stroke="#86EFAC" stroke-width="8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- DOWN arrow shaft (dark purple) -->
+  <path d="M68,16 L68,40" stroke="#4C1D95" stroke-width="8" stroke-linecap="round"/>
+  <!-- DOWN arrow head (dark purple) -->
+  <path d="M56,28 L68,42 L80,28" fill="none" stroke="#4C1D95" stroke-width="8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -4,7 +4,10 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Ivory/warm white background -->
     <path
-        android:fillColor="#1565C0"
-        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
+        android:fillColor="#FDF6E4"
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
+
 </vector>

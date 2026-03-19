@@ -34,3 +34,21 @@ Thumbs.db
 # Test results
 app/src/test/results/
 
+# Misc
+
+*.svg~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor temp files
+*.swp
+*.swo
+*~
+.vscode/
+.fleet/
+
+# Environment
+.env
+.env.local
+

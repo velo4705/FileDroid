@@ -14,12 +14,16 @@ import com.filedroid.remote.RemoteClient
 import com.filedroid.remote.RemoteFile
 import com.filedroid.remote.SftpClient
 import com.filedroid.transfer.TransferEngine
+import com.filedroid.transfer.TransferJob
+import com.filedroid.transfer.TransferStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
@@ -38,7 +42,8 @@ data class RemoteBrowserUiState(
     val selectedFile: RemoteFile? = null,
     val showReconnectPrompt: Boolean = false,
     val downloadedToPath: String? = null,
-    val uploadedFileName: String? = null
+    val uploadedFileName: String? = null,
+    val activeUploads: List<TransferJob> = emptyList()
 )
 
 @HiltViewModel
@@ -53,6 +58,15 @@ class RemoteBrowserViewModel @Inject constructor(
 
     private var client: RemoteClient? = null
     private val backStack = ArrayDeque<String>()
+
+    init {
+        // Keep activeUploads in sync with TransferEngine so the UI can show progress
+        transferEngine.jobs
+            .onEach { jobs ->
+                _uiState.update { it.copy(activeUploads = jobs.filter { j -> j.status == TransferStatus.IN_PROGRESS }) }
+            }
+            .launchIn(viewModelScope)
+    }
 
     fun loadAndConnect(profileId: Long) {
         viewModelScope.launch {
@@ -190,7 +204,10 @@ class RemoteBrowserViewModel @Inject constructor(
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     tmp.outputStream().use { input.copyTo(it) }
                 }
-                transferEngine.enqueueUpload(c, tmp.absolutePath, remotePath)
+                transferEngine.enqueueUpload(c, tmp.absolutePath, remotePath) {
+                    // Refresh directory listing once upload completes
+                    viewModelScope.launch { refresh() }
+                }
                 _uiState.update { it.copy(uploadedFileName = fileName) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "Upload failed: ${e.message}") }
@@ -203,12 +220,20 @@ class RemoteBrowserViewModel @Inject constructor(
         val c = client ?: return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // Materialise the tree into a temp directory
-                val tmpDir = File(context.cacheDir, "upload_${System.currentTimeMillis()}")
-                copyDocumentTree(uri, tmpDir)
-                val remotePath = _uiState.value.currentPath.trimEnd('/') + "/${tmpDir.name}"
-                transferEngine.enqueueDirectoryUpload(c, tmpDir.absolutePath, remotePath)
-                _uiState.update { it.copy(uploadedFileName = tmpDir.name + "/") }
+                val doc = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, uri)
+                // Use the actual folder name from the document tree
+                val folderName = doc?.name ?: "folder_${System.currentTimeMillis()}"
+                val tmpDir = File(context.cacheDir, folderName)
+                // Copy contents directly into tmpDir (not into a sub-folder)
+                tmpDir.mkdirs()
+                doc?.listFiles()?.forEach { child ->
+                    copyDocumentFile(child, tmpDir)
+                }
+                val remotePath = _uiState.value.currentPath.trimEnd('/') + "/$folderName"
+                transferEngine.enqueueDirectoryUpload(c, tmpDir.absolutePath, remotePath) {
+                    viewModelScope.launch { refresh() }
+                }
+                _uiState.update { it.copy(uploadedFileName = "$folderName/") }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "Folder upload failed: ${e.message}") }
             }
@@ -217,7 +242,6 @@ class RemoteBrowserViewModel @Inject constructor(
 
     /** Resolve the human-readable display name from a content URI. */
     private fun resolveFileName(uri: Uri): String {
-        // Try OpenableColumns first (works for most pickers)
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { cursor ->
                 if (cursor.moveToFirst()) {
@@ -225,16 +249,8 @@ class RemoteBrowserViewModel @Inject constructor(
                     if (idx >= 0) return cursor.getString(idx)
                 }
             }
-        // Fallback: last path segment of the URI
         return uri.lastPathSegment?.substringAfterLast("/")
             ?: "upload_${System.currentTimeMillis()}"
-    }
-
-    /** Recursively copy a document tree URI into a local directory. */
-    private fun copyDocumentTree(treeUri: Uri, destDir: File) {
-        destDir.mkdirs()
-        val docId = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri) ?: return
-        copyDocumentFile(docId, destDir)
     }
 
     private fun copyDocumentFile(

@@ -33,7 +33,7 @@ class TransferEngine @Inject constructor() {
         execute(job, client)
     }
 
-    fun enqueueUpload(client: RemoteClient, localPath: String, remotePath: String) {
+    fun enqueueUpload(client: RemoteClient, localPath: String, remotePath: String, onDone: (() -> Unit)? = null) {
         val file = File(localPath)
         val job = TransferJob(
             direction = TransferDirection.UPLOAD,
@@ -43,7 +43,7 @@ class TransferEngine @Inject constructor() {
             totalBytes = file.length()
         )
         addJob(job)
-        execute(job, client)
+        execute(job, client, onDone)
     }
 
     /** Recursively download a remote directory to a local path. */
@@ -71,7 +71,12 @@ class TransferEngine @Inject constructor() {
     }
 
     /** Recursively upload a local directory to a remote path. */
-    fun enqueueDirectoryUpload(client: RemoteClient, localPath: String, remotePath: String) {
+    fun enqueueDirectoryUpload(
+        client: RemoteClient,
+        localPath: String,
+        remotePath: String,
+        onDone: (() -> Unit)? = null
+    ) {
         val dir = File(localPath)
         val job = TransferJob(
             direction = TransferDirection.UPLOAD,
@@ -83,9 +88,12 @@ class TransferEngine @Inject constructor() {
         addJob(job)
         val coroutine = scope.launch {
             updateJob(job.id) { it.copy(status = TransferStatus.IN_PROGRESS) }
-            val result = runCatching { uploadDirRecursive(client, dir, remotePath) }
+            val result = runCatching { uploadDirRecursive(client, dir, remotePath, job.id) }
             result.fold(
-                onSuccess = { updateJob(job.id) { it.copy(status = TransferStatus.DONE) } },
+                onSuccess = {
+                    updateJob(job.id) { it.copy(status = TransferStatus.DONE) }
+                    onDone?.invoke()
+                },
                 onFailure = { e ->
                     if (e is CancellationException) updateJob(job.id) { it.copy(status = TransferStatus.CANCELLED) }
                     else updateJob(job.id) { it.copy(status = TransferStatus.FAILED, errorMessage = e.message) }
@@ -110,14 +118,28 @@ class TransferEngine @Inject constructor() {
         }
     }
 
-    private suspend fun uploadDirRecursive(client: RemoteClient, localDir: File, remotePath: String) {
+    private suspend fun uploadDirRecursive(client: RemoteClient, localDir: File, remotePath: String, jobId: String? = null) {
         client.createDirectory(remotePath) // ignore error if already exists
         for (child in (localDir.listFiles() ?: emptyArray())) {
             val childRemote = "$remotePath/${child.name}"
             if (child.isDirectory) {
-                uploadDirRecursive(client, child, childRemote)
+                uploadDirRecursive(client, child, childRemote, jobId)
             } else {
-                val input = child.inputStream()
+                val input = if (jobId != null) {
+                    ProgressInputStream(child.inputStream(), child.length()) { transferred, speed ->
+                        // accumulate into parent job
+                        _jobs.update { list ->
+                            list.map { job ->
+                                if (job.id == jobId)
+                                    job.copy(
+                                        transferredBytes = (job.transferredBytes + transferred).coerceAtMost(job.totalBytes),
+                                        speedBytesPerSec = speed
+                                    )
+                                else job
+                            }
+                        }
+                    }
+                } else child.inputStream()
                 client.upload(input, childRemote).also { input.close() }.getOrThrow()
             }
         }
@@ -143,7 +165,7 @@ class TransferEngine @Inject constructor() {
         _jobs.update { it + job }
     }
 
-    private fun execute(job: TransferJob, client: RemoteClient) {
+    private fun execute(job: TransferJob, client: RemoteClient, onDone: (() -> Unit)? = null) {
         val coroutine = scope.launch {
             updateJob(job.id) { it.copy(status = TransferStatus.IN_PROGRESS) }
             val result = if (job.direction == TransferDirection.DOWNLOAD) {
@@ -152,7 +174,10 @@ class TransferEngine @Inject constructor() {
                 runUpload(job, client)
             }
             result.fold(
-                onSuccess = { updateJob(job.id) { it.copy(status = TransferStatus.DONE, transferredBytes = it.totalBytes) } },
+                onSuccess = {
+                    updateJob(job.id) { it.copy(status = TransferStatus.DONE, transferredBytes = it.totalBytes) }
+                    onDone?.invoke()
+                },
                 onFailure = { e ->
                     if (e is CancellationException) {
                         updateJob(job.id) { it.copy(status = TransferStatus.CANCELLED) }

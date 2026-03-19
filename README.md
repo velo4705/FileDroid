@@ -1,7 +1,7 @@
 # FileDroid
 
 <p align="center">
-  <img src="https://img.shields.io/badge/%F0%9F%93%82-FileDroid-1565C0?style=for-the-badge" alt="FileDroid" />
+  <img src=".branding/icon.svg" alt="FileDroid icon" width="108" height="108" />
 </p>
 
 <p align="center">

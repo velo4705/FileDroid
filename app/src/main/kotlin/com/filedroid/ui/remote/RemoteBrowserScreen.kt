@@ -235,6 +235,48 @@ fun RemoteBrowserScreen(
                 ) { Text(uiState.error ?: "") }
             }
 
+            // Active upload progress panel
+            if (uiState.activeUploads.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(12.dp)
+                        .fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        uiState.activeUploads.forEach { job ->
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "↑ ${job.fileName}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        buildString {
+                                            append("${job.progressPercent}%")
+                                            if (job.speedBytesPerSec > 0) append("  ${formatSpeed(job.speedBytesPerSec)}")
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                                LinearProgressIndicator(
+                                    progress = { job.progressFraction },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Download queued toast
             if (uiState.downloadedToPath != null) {
                 LaunchedEffect(uiState.downloadedToPath) {
@@ -244,17 +286,6 @@ fun RemoteBrowserScreen(
                 Snackbar(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
                 ) { Text("Download queued → Downloads/") }
-            }
-
-            // Upload queued toast
-            if (uiState.uploadedFileName != null) {
-                LaunchedEffect(uiState.uploadedFileName) {
-                    kotlinx.coroutines.delay(2500)
-                    viewModel.clearUploadedToast()
-                }
-                Snackbar(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
-                ) { Text("Uploading ${uiState.uploadedFileName}…") }
             }
         }
     }
@@ -408,6 +439,12 @@ private fun formatSize(bytes: Long): String = when {
     bytes < 1024 * 1024 -> "${bytes / 1024} KB"
     bytes < 1024 * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
     else -> "${bytes / (1024 * 1024 * 1024)} GB"
+}
+
+private fun formatSpeed(bps: Long): String = when {
+    bps < 1024 -> "$bps B/s"
+    bps < 1024 * 1024 -> "${bps / 1024} KB/s"
+    else -> "${bps / (1024 * 1024)} MB/s"
 }
 
 @Composable
