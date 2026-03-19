@@ -22,10 +22,8 @@ class SftpServerManager @Inject constructor() {
     fun start(config: ServerConfig, hostKeyFile: File): Result<Unit> = runCatching {
         val sshd = SshServer.setUpDefaultServer()
         sshd.port = config.sftpPort
-
-        if (config.bindAddress.isNotBlank()) {
-            sshd.host = config.bindAddress
-        }
+        // Explicitly bind to all interfaces when no specific one is selected
+        sshd.host = if (config.bindAddress.isNotBlank()) config.bindAddress else "0.0.0.0"
 
         val keyProvider = SimpleGeneratorHostKeyProvider(hostKeyFile.toPath()).apply {
             algorithm = KeyPairProvider.SSH_RSA
@@ -43,9 +41,10 @@ class SftpServerManager @Inject constructor() {
         sshd.start()
 
         // sshd.start() is non-blocking — wait until the port is actually bound (up to 5s)
+        val bindHost = if (config.bindAddress.isNotBlank()) config.bindAddress else "0.0.0.0"
         val deadline = System.currentTimeMillis() + 5_000
         while (System.currentTimeMillis() < deadline) {
-            if (isPortBound(config.sftpPort)) break
+            if (isPortBound(bindHost, config.sftpPort)) break
             Thread.sleep(100)
         }
 
@@ -61,10 +60,10 @@ class SftpServerManager @Inject constructor() {
 
     fun isRunning(): Boolean = running && server != null && !server!!.isClosed
 
-    private fun isPortBound(port: Int): Boolean = try {
+    private fun isPortBound(host: String, port: Int): Boolean = try {
         ServerSocket().use { s ->
             s.reuseAddress = true
-            s.bind(InetSocketAddress(port))
+            s.bind(InetSocketAddress(host, port))
             false // bound successfully = port was free = server not listening yet
         }
     } catch (_: Exception) {
