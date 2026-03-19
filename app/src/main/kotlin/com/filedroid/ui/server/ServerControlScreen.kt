@@ -1,5 +1,12 @@
 package com.filedroid.ui.server
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -9,7 +16,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -19,11 +28,70 @@ fun ServerControlScreen(
     viewModel: ServerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var ftpChecked by remember { mutableStateOf(true) }
     var sftpChecked by remember { mutableStateOf(true) }
     val anyRunning = uiState.ftpRunning || uiState.sftpRunning
 
     LaunchedEffect(Unit) { viewModel.refresh() }
+
+    var pendingStart by remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
+    val notifLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            pendingStart?.let { (ftp, sftp) -> viewModel.startServers(ftp, sftp) }
+        }
+        // if denied we already showed the rationale dialog below — server won't start without notif on 13+
+        pendingStart = null
+    }
+
+    // Shown when permission is permanently denied — user must go to Settings
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = { Text("Notification permission required") },
+            text = { Text("FileDroid needs notification permission to show the server status while it runs in the background. Please enable it in Settings.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSettingsDialog = false
+                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    })
+                }) { Text("Open Settings") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSettingsDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    fun requestStartServers(ftp: Boolean, sftp: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val activity = context as? android.app.Activity
+            val alreadyGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            when {
+                alreadyGranted -> viewModel.startServers(ftp, sftp)
+                activity != null && ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity, Manifest.permission.POST_NOTIFICATIONS
+                ) -> {
+                    // Can still ask — show the system dialog
+                    pendingStart = ftp to sftp
+                    notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                else -> {
+                    // Permanently denied — send to Settings
+                    showSettingsDialog = true
+                }
+            }
+        } else {
+            viewModel.startServers(ftp, sftp)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -93,7 +161,7 @@ fun ServerControlScreen(
                 }
             } else {
                 Button(
-                    onClick = { viewModel.startServers(ftpChecked, sftpChecked) },
+                    onClick = { requestStartServers(ftpChecked, sftpChecked) },
                     enabled = ftpChecked || sftpChecked,
                     modifier = Modifier.fillMaxWidth()
                 ) {
