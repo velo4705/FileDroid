@@ -62,7 +62,8 @@ android {
                 "META-INF/NOTICE.txt",
                 "META-INF/*.SF",
                 "META-INF/*.DSA",
-                "META-INF/*.RSA"
+                "META-INF/*.RSA",
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
             )
         }
     }
@@ -107,6 +108,7 @@ dependencies {
     // Networking — FTP + SFTP client
     implementation(libs.commons.net)
     implementation(libs.sshj)
+    implementation(libs.bouncycastle)
 
     // Server — Apache MINA SSHD + Apache FTP Server
     implementation(libs.mina.sshd.core)

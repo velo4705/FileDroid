@@ -15,13 +15,7 @@ import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.io.InputStream
 import java.io.OutputStream
 
-private fun safeConfig() = DefaultConfig().apply {
-    keyExchangeFactories = keyExchangeFactories.filter { factory ->
-        val name = factory.name
-        !name.contains("x25519", ignoreCase = true) &&
-        !name.contains("x448", ignoreCase = true)
-    }
-}
+private fun safeConfig() = DefaultConfig()
 
 /** Represents a single interactive SSH shell session with auto-reconnect (R6.4). */
 class SshSession(

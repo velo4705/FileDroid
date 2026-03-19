@@ -11,6 +11,7 @@ securityCrypto = "1.1.0-alpha06"
 room = "2.6.1"
 commonsNet = "3.10.0"
 sshj = "0.38.0"
+bouncycastle = "1.78.1"
 minaSshd = "2.13.0"
 ftpServer = "1.1.1"
 kotest = "5.9.1"
@@ -48,6 +49,7 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 # Networking
 commons-net = { group = "commons-net", name = "commons-net", version.ref = "commonsNet" }
 sshj = { group = "com.hierynomus", name = "sshj", version.ref = "sshj" }
+bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 mina-sshd-core = { group = "org.apache.sshd", name = "sshd-core", version.ref = "minaSshd" }
 mina-sshd-sftp = { group = "org.apache.sshd", name = "sshd-sftp", version.ref = "minaSshd" }
 ftpserver-core = { group = "org.apache.ftpserver", name = "ftpserver-core", version.ref = "ftpServer" }

@@ -13,14 +13,7 @@ import java.io.OutputStream
 import javax.inject.Inject
 
 /** Build an SSHClient config that avoids X25519/X448 (requires BC on Android). */
-private fun safeConfig() = DefaultConfig().apply {
-    // Keep only kex algorithms that work with Android's built-in JCE — drop X25519/X448
-    keyExchangeFactories = keyExchangeFactories.filter { factory ->
-        val name = factory.name
-        !name.contains("x25519", ignoreCase = true) &&
-        !name.contains("x448", ignoreCase = true)
-    }
-}
+private fun safeConfig() = DefaultConfig()
 
 class SftpClient @Inject constructor() : RemoteClient {
 
