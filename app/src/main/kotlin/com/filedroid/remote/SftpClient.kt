@@ -12,6 +12,16 @@ import java.io.InputStream
 import java.io.OutputStream
 import javax.inject.Inject
 
+/** Build an SSHClient config that avoids X25519/X448 (requires BC on Android). */
+private fun safeConfig() = DefaultConfig().apply {
+    // Keep only kex algorithms that work with Android's built-in JCE — drop X25519/X448
+    keyExchangeFactories = keyExchangeFactories.filter { factory ->
+        val name = factory.name
+        !name.contains("x25519", ignoreCase = true) &&
+        !name.contains("x448", ignoreCase = true)
+    }
+}
+
 class SftpClient @Inject constructor() : RemoteClient {
 
     private var ssh: SSHClient? = null
@@ -20,7 +30,7 @@ class SftpClient @Inject constructor() : RemoteClient {
     override suspend fun connect(host: String, port: Int, username: String, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching<Unit> {
-                val client = SSHClient(DefaultConfig())
+                val client = SSHClient(safeConfig())
                 client.addHostKeyVerifier(PromiscuousVerifier())
                 client.connectTimeout = 10_000
                 client.connect(host, port)
@@ -32,8 +42,6 @@ class SftpClient @Inject constructor() : RemoteClient {
 
     /**
      * R2.8 — authenticate with a PEM/OpenSSH private key instead of a password.
-     * [privateKeyPem] is the raw key text (RSA/EC/Ed25519 PEM or OpenSSH format).
-     * [passphrase] is optional if the key is encrypted.
      */
     suspend fun connectWithKey(
         host: String,
@@ -43,12 +51,11 @@ class SftpClient @Inject constructor() : RemoteClient {
         passphrase: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching<Unit> {
-            // SSHJ loadKeys requires a file path, so write to a temp file
             val keyFile = java.io.File.createTempFile("sshj_key_", null).apply {
                 writeText(privateKeyPem)
                 deleteOnExit()
             }
-            val client = SSHClient(DefaultConfig())
+            val client = SSHClient(safeConfig())
             client.addHostKeyVerifier(PromiscuousVerifier())
             client.connectTimeout = 10_000
             client.connect(host, port)

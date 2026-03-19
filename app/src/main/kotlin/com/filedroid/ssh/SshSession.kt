@@ -15,6 +15,14 @@ import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.io.InputStream
 import java.io.OutputStream
 
+private fun safeConfig() = DefaultConfig().apply {
+    keyExchangeFactories = keyExchangeFactories.filter { factory ->
+        val name = factory.name
+        !name.contains("x25519", ignoreCase = true) &&
+        !name.contains("x448", ignoreCase = true)
+    }
+}
+
 /** Represents a single interactive SSH shell session with auto-reconnect (R6.4). */
 class SshSession(
     val id: String,
@@ -45,7 +53,7 @@ class SshSession(
         }
 
     private fun doConnect(host: String, port: Int, username: String, password: String) {
-        val client = SSHClient(DefaultConfig())
+        val client = SSHClient(safeConfig())
         client.addHostKeyVerifier(PromiscuousVerifier())
         client.connectTimeout = 10_000
         client.connect(host, port)
