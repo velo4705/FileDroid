@@ -1,5 +1,13 @@
 package com.filedroid.ui.home
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudQueue
@@ -8,17 +16,15 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.DisposableEffect
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,8 +38,12 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
-    // Re-check credentials and permissions every time this screen resumes
+    // Re-check immediately when this screen first appears (e.g. after first-launch dialog)
+    LaunchedEffect(Unit) { viewModel.refresh() }
+
+    // Re-check on every resume (covers returning from Settings permission page)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -42,6 +52,11 @@ fun HomeScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+
+    // Launcher for normal READ/WRITE permissions (Android < 11)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { viewModel.refresh() }
 
     Scaffold(
         topBar = {
@@ -63,7 +78,6 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Browse local files
             Button(
                 onClick = onNavigateToLocalBrowser,
                 modifier = Modifier.fillMaxWidth()
@@ -108,7 +122,6 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Start server (enabled only when credentials + permission are set)
             Button(
                 onClick = onNavigateToServer,
                 enabled = uiState.canStartServer,
@@ -119,15 +132,43 @@ fun HomeScreen(
 
             if (!uiState.canStartServer) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = when {
-                        !uiState.hasServerPassword -> "Set a server password in Settings first."
-                        !uiState.storagePermissionGranted -> "Storage permission required."
-                        else -> ""
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error
-                )
+                when {
+                    !uiState.hasServerPassword -> {
+                        Text(
+                            "Set a server password in Settings first.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    !uiState.storagePermissionGranted -> {
+                        Text(
+                            "Storage permission required.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedButton(onClick = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                // Android 11+ — send to special "All files access" settings page
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            } else {
+                                // Android 10 and below — normal runtime permission request
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                    )
+                                )
+                            }
+                        }) {
+                            Text("Grant Permission")
+                        }
+                    }
+                }
             }
         }
     }

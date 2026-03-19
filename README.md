@@ -88,6 +88,33 @@ To connect to a machine, you need its **IP address**, **port**, **username**, an
 
 ---
 
+### Android (without Termux)
+
+Use a file manager app that has a built-in FTP server, such as [Material Files](https://play.google.com/store/apps/details?id=me.zhanghai.android.files) or [MiXplorer](https://mixplorer.com/).
+
+1. Open the app and find its **FTP server** option (usually under a menu or sidebar)
+2. Start the server — the app will display:
+   - **IP address** (e.g. `192.168.1.x`)
+   - **Port** (usually `2121`)
+   - **Username and password** (you set these in the app, or it uses anonymous access)
+3. Enter those details in FileDroid to connect
+
+> Both devices must be on the same Wi-Fi network.
+
+---
+
+### iOS
+
+Use an app that can host a local FTP server, such as [Documents by Readdle](https://apps.apple.com/app/documents-by-readdle/id364901807).
+
+1. Open the app → tap the Wi-Fi / computer icon to start the local server
+2. The app shows the full connection address (e.g. `ftp://192.168.1.x:2121`) along with any username/password
+3. Enter those details in FileDroid to connect
+
+> iOS sandboxes each app, so you can only browse files that the server app itself has access to — not the full iOS filesystem.
+
+---
+
 ### Windows
 
 **Find the IP address**
