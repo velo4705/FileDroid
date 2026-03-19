@@ -13,7 +13,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.io.OutputStream
@@ -55,9 +54,7 @@ class SshSession(val id: String, val label: String) {
         client.authPassword(username, password)
 
         val sess = client.startSession()
-        // Disable remote echo — we send full lines, so the PTY echoing chars back causes duplicates
-        val ptyModes = mutableMapOf<PTYMode, Int>(PTYMode.ECHO to 0)
-        sess.allocatePTY("xterm", 220, 50, 0, 0, ptyModes)
+        sess.allocatePTY("xterm", 220, 50, 0, 0, mutableMapOf())
         val sh = sess.startShell()
 
         ssh = client
@@ -66,42 +63,15 @@ class SshSession(val id: String, val label: String) {
         stdin = sh.outputStream
         isConnected = true
 
-        // Send stty -echo to suppress shell-level line echo, then a sentinel so we know
-        // when the shell has processed it and we can start showing output to the user.
-        val sentinel = "__FILEDROID_READY__"
-        sh.outputStream.write("stty -echo; echo $sentinel\n".toByteArray(Charsets.UTF_8))
-        sh.outputStream.flush()
-
         // Read loop runs in the session scope — tied to this session's lifetime
         readJob = scope.launch {
             val buf = ByteArray(4096)
-            val initBuf = StringBuilder()
-            var ready = false
             try {
                 while (isConnected) {
                     val n = withContext(Dispatchers.IO) { sh.inputStream.read(buf) }
                     if (n == -1) break
                     val chunk = String(buf, 0, n, Charsets.UTF_8)
-                    if (!ready) {
-                        // Swallow everything until we see the sentinel line
-                        initBuf.append(chunk)
-                        val combined = initBuf.toString()
-                        val idx = combined.indexOf(sentinel)
-                        if (idx != -1) {
-                            ready = true
-                            // Emit anything that came after the sentinel on the same read
-                            val after = combined.substring(idx + sentinel.length)
-                                .trimStart('\r', '\n')
-                            if (after.isNotEmpty()) _output.emit(after)
-                        }
-                    } else {
-                        // Strip any line that is just the echoed command we sent
-                        val filtered = if (lastSent.isNotEmpty()) {
-                            chunk.replace(lastSent + "\r\n", "")
-                                 .replace(lastSent + "\n", "")
-                        } else chunk
-                        if (filtered.isNotEmpty()) _output.emit(filtered)
-                    }
+                    _output.emit(filterEcho(chunk))
                 }
             } catch (_: Exception) { }
             finally {
@@ -139,6 +109,24 @@ class SshSession(val id: String, val label: String) {
             }
         }
     }
+
+    /**
+     * Removes any line from [chunk] whose visible text (ANSI stripped) matches the last
+     * sent command. Works across all shells/distros including Termux which injects escape
+     * codes mid-echo.
+     */
+    private fun filterEcho(chunk: String): String {
+        val cmd = lastSent
+        if (cmd.isEmpty()) return chunk
+        // Split on \r\n or \n, keeping delimiters so we can reconstruct faithfully
+        val lines = chunk.split(Regex("(?<=\r\n)|(?<=\n)"))
+        return lines.filterNot { line ->
+            stripAnsi(line).trimEnd('\r', '\n') == cmd
+        }.joinToString("")
+    }
+
+    private fun stripAnsi(s: String): String =
+        s.replace(Regex("\u001B(?:\\[[?!]?[0-9;]*[A-Za-z]|\\][^\u0007\u001B]*(?:\u0007|\u001B\\\\)|[^\\[\\]])"), "")
 
     fun disconnect() {
         lastHost = ""

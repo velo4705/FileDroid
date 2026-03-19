@@ -134,6 +134,7 @@ private fun TerminalPane(
     val hScroll = rememberScrollState()
 
     LaunchedEffect(tab.buffer) { vScroll.animateScrollTo(vScroll.maxValue) }
+    LaunchedEffect(input) { vScroll.animateScrollTo(vScroll.maxValue) }
 
     Column(modifier = modifier.background(Color.Black)) {
         when {
@@ -158,8 +159,8 @@ private fun TerminalPane(
                         cursorVisible = !cursorVisible
                     }
                 }
-                val displayText = remember(tab.buffer, cursorVisible) {
-                    parseAnsi(tab.buffer + if (cursorVisible) "█" else " ")
+                val displayText = remember(tab.buffer, input, cursorVisible) {
+                    parseAnsi(tab.buffer + input + if (cursorVisible) "█" else " ")
                 }
                 Text(
                     text = displayText,
