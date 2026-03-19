@@ -1,21 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
   <rect width="108" height="108" rx="22" fill="#FDF6E4"/>
 
-  <!-- Folder body — centered on x=54 -->
-  <path d="M14,58 Q14,52 20,52 L36,52 Q39,52 41,50 L43,48 Q45,46 48,46 L88,46 Q94,46 94,52 L94,84 Q94,90 88,90 L20,90 Q14,90 14,84 Z"
+  <!-- Folder body — precise 0.92 scale of arrows-j -->
+  <path d="M13.5,54 Q13.5,46.6 19.3,46.6 L37.1,46.6 Q39.9,46.6 41.7,44.8 L44.5,42 Q46.3,40.2 49.9,40.2 L88.5,40.2 Q94.5,40.2 94.5,45.5 L94.5,84.1 Q94.5,89.5 88.5,89.5 L19.3,89.5 Q13.5,89.5 13.5,84.1 Z"
         fill="#166534"/>
 
   <!-- Folder tab highlight -->
-  <path d="M14,58 L94,58 L94,52 Q94,46 88,46 L48,46 Q45,46 43,48 L41,50 Q39,52 36,52 L20,52 Q14,52 14,58 Z"
+  <path d="M13.5,54 L94.5,54 L94.5,45.5 Q94.5,40.2 88.5,40.2 L49.9,40.2 Q46.3,40.2 44.5,42 L41.7,44.8 Q39.9,46.6 37.1,46.6 L19.3,46.6 Q13.5,46.6 13.5,54 Z"
         fill="#16A34A"/>
 
-  <!-- UP arrow centered at x=38 (54-16), light mint -->
-  <path d="M38,46 L38,24" stroke="#86EFAC" stroke-width="7" stroke-linecap="round"/>
-  <path d="M28,35 L38,22 L48,35" fill="none" stroke="#86EFAC" stroke-width="7"
+  <!-- UP arrow (light mint) -->
+  <path d="M41,43 L41,19" stroke="#86EFAC" stroke-width="7.4" stroke-linecap="round"/>
+  <path d="M29.6,31 L41,17.5 L52.4,31" fill="none" stroke="#86EFAC" stroke-width="7.4"
         stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- DOWN arrow centered at x=70 (54+16), dark purple -->
-  <path d="M70,22 L70,44" stroke="#4C1D95" stroke-width="7" stroke-linecap="round"/>
-  <path d="M60,33 L70,46 L80,33" fill="none" stroke="#4C1D95" stroke-width="7"
+  <!-- DOWN arrow (dark purple) -->
+  <path d="M67,17.5 L67,41" stroke="#4C1D95" stroke-width="7.4" stroke-linecap="round"/>
+  <path d="M55.6,29 L67,43 L78.4,29" fill="none" stroke="#4C1D95" stroke-width="7.4"
         stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
