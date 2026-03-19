@@ -60,15 +60,17 @@ fun RemoteBrowserScreen(
             if (searchActive) {
                 TopAppBar(
                     title = {
-                        OutlinedTextField(
+                        TextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             placeholder = { Text("Search files…") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                                focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                             )
                         )
                     },

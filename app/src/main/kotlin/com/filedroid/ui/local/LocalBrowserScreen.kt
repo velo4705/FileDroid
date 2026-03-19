@@ -184,6 +184,7 @@ fun LocalBrowserScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SearchBar(
     query: String,
@@ -193,7 +194,7 @@ private fun SearchBar(
 ) {
     TopAppBar(
         title = {
-            OutlinedTextField(
+            TextField(
                 value = query,
                 onValueChange = onQueryChange,
                 placeholder = { Text("Search files…") },
@@ -201,9 +202,11 @@ private fun SearchBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                    focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 )
             )
         },
