@@ -64,8 +64,7 @@ fun NavGraph(navController: NavHostController) {
         composable(Routes.PROFILES) {
             ProfileListScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onConnect = { navController.navigate("${Routes.REMOTE_BROWSER}/$it") },
-                onEdit = { navController.navigate("${Routes.PROFILES}/$it/edit") }
+                onConnect = { navController.navigate("${Routes.REMOTE_BROWSER}/$it") }
             )
         }
         composable(

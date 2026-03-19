@@ -22,11 +22,11 @@ import com.filedroid.data.ConnectionProfile
 fun ProfileListScreen(
     onNavigateBack: () -> Unit,
     onConnect: (Long) -> Unit,
-    onEdit: (Long) -> Unit,
     viewModel: ProfileListViewModel = hiltViewModel()
 ) {
     val profiles by viewModel.profiles.collectAsState()
-    var showAddSheet by remember { mutableStateOf(false) }
+    var editTarget by remember { mutableStateOf<ConnectionProfile?>(null) }
+    var showSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -40,7 +40,7 @@ fun ProfileListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddSheet = true }) {
+            FloatingActionButton(onClick = { editTarget = null; showSheet = true }) {
                 Icon(Icons.Default.Add, contentDescription = "Add connection")
             }
         }
@@ -55,7 +55,7 @@ fun ProfileListScreen(
                     ProfileRow(
                         profile = profile,
                         onClick = { onConnect(profile.id) },
-                        onEdit = { onEdit(profile.id) },
+                        onEdit = { editTarget = profile; showSheet = true },
                         onDelete = { viewModel.delete(profile) }
                     )
                     HorizontalDivider()
@@ -64,16 +64,19 @@ fun ProfileListScreen(
         }
     }
 
-    if (showAddSheet) {
+    if (showSheet) {
         ProfileEditSheet(
-            profile = null,
+            profile = editTarget,
             onSave = { label, protocol, host, port, user, pass, path, anon, useKey, key, phrase ->
-                viewModel.save(label = label, protocol = protocol, host = host, port = port,
+                viewModel.save(
+                    id = editTarget?.id ?: 0,
+                    label = label, protocol = protocol, host = host, port = port,
                     username = user, password = pass, initialPath = path, anonymous = anon,
-                    usePrivateKey = useKey, privateKey = key, passphrase = phrase)
-                showAddSheet = false
+                    usePrivateKey = useKey, privateKey = key, passphrase = phrase
+                )
+                showSheet = false; editTarget = null
             },
-            onDismiss = { showAddSheet = false }
+            onDismiss = { showSheet = false; editTarget = null }
         )
     }
 }

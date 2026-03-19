@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
@@ -44,7 +45,7 @@ class SshSession(
         }
 
     private fun doConnect(host: String, port: Int, username: String, password: String) {
-        val client = SSHClient()
+        val client = SSHClient(DefaultConfig())
         client.addHostKeyVerifier(PromiscuousVerifier())
         client.connectTimeout = 10_000
         client.connect(host, port)

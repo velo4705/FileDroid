@@ -3,6 +3,7 @@ package com.filedroid.remote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
@@ -19,7 +20,7 @@ class SftpClient @Inject constructor() : RemoteClient {
     override suspend fun connect(host: String, port: Int, username: String, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching<Unit> {
-                val client = SSHClient()
+                val client = SSHClient(DefaultConfig())
                 client.addHostKeyVerifier(PromiscuousVerifier())
                 client.connectTimeout = 10_000
                 client.connect(host, port)
@@ -47,7 +48,7 @@ class SftpClient @Inject constructor() : RemoteClient {
                 writeText(privateKeyPem)
                 deleteOnExit()
             }
-            val client = SSHClient()
+            val client = SSHClient(DefaultConfig())
             client.addHostKeyVerifier(PromiscuousVerifier())
             client.connectTimeout = 10_000
             client.connect(host, port)
