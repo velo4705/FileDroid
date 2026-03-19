@@ -106,10 +106,16 @@ class ServerForegroundService : Service() {
 
         // Server socket binding must happen off the main thread
         serviceScope.launch {
-            if (resolved.ftpEnabled) ftpManager.start(resolved).onFailure { stopSelf() }
+            if (resolved.ftpEnabled) ftpManager.start(resolved).onFailure {
+                updateNotificationError("FTP failed: ${it.message}")
+                if (!resolved.sftpEnabled) stopSelf()
+            }
             if (resolved.sftpEnabled) {
                 val keyFile = File(filesDir, "host_key.ser")
-                sftpManager.start(resolved, keyFile).onFailure { stopSelf() }
+                sftpManager.start(resolved, keyFile).onFailure {
+                    updateNotificationError("SFTP failed: ${it.message}")
+                    if (!resolved.ftpEnabled || ftpManager.isRunning().not()) stopSelf()
+                }
             }
         }
     }
@@ -128,6 +134,18 @@ class ServerForegroundService : Service() {
         val config = activeConfig ?: return
         val nm = getSystemService(NotificationManager::class.java)
         nm.notify(NOTIF_ID, buildNotification(config))
+    }
+
+    private fun updateNotificationError(error: String) {
+        val nm = getSystemService(NotificationManager::class.java)
+        val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_upload)
+            .setContentTitle("FileDroid Server Error")
+            .setContentText(error)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(error))
+            .setOngoing(false)
+            .build()
+        nm.notify(NOTIF_ID, notif)
     }
 
     override fun onDestroy() {

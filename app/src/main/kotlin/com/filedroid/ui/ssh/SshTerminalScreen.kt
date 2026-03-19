@@ -176,7 +176,7 @@ private fun TerminalPane(
             }
         }
 
-        // Input row — characters sent immediately as typed for real terminal feel
+        // Input row — send full line on Enter/Send button only
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -186,13 +186,7 @@ private fun TerminalPane(
         ) {
             BasicTextField(
                 value = input,
-                onValueChange = { new ->
-                    // Send the diff (newly typed characters) immediately
-                    if (new.length > input.length) {
-                        onSend(new.substring(input.length))
-                    }
-                    input = new
-                },
+                onValueChange = { input = it },
                 textStyle = androidx.compose.ui.text.TextStyle(
                     color = Color.White,
                     fontFamily = FontFamily.Monospace,
@@ -200,7 +194,7 @@ private fun TerminalPane(
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
-                    onSend("\n")
+                    onSend(input + "\n")
                     input = ""
                 }),
                 modifier = Modifier.weight(1f),
@@ -257,28 +251,24 @@ private fun ConnectDialog(
 private fun parseAnsi(raw: String): AnnotatedString {
     val text = raw.replace("\r\n", "\n").replace("\r", "\n")
     return buildAnnotatedString {
-        // Match any ESC sequence: ESC [ ... (CSI), ESC ] ... (OSC), ESC . (2-char)
-        val escRegex = Regex("\u001B(?:\\[[0-9;]*[A-Za-z]|\\][^\u0007]*(?:\u0007|\u001B\\\\)|[^\\[\\]])")
-        // Only keep SGR color sequences (ESC [ ... m) for coloring, strip everything else
+        // Matches all escape sequences:
+        // CSI: ESC [ <params> <final>  (covers [?2004h, [K, [m, [1;32m, etc.)
+        // OSC: ESC ] ... ST/BEL
+        // Two-char: ESC <any single char>
+        val escRegex = Regex("\u001B(?:\\[[?!]?[0-9;]*[A-Za-z]|\\][^\u0007\u001B]*(?:\u0007|\u001B\\\\)|[^\\[\\]])")
         val sgrRegex = Regex("\u001B\\[([0-9;]*)m")
         var currentColor: Color? = null
         var cursor = 0
 
-        // Find all escape sequences in order
-        val allEscapes = escRegex.findAll(text).toList()
-        for (match in allEscapes) {
-            // Append plain text before this escape
+        for (match in escRegex.findAll(text)) {
             val before = text.substring(cursor, match.range.first)
             if (before.isNotEmpty()) {
                 if (currentColor != null) withStyle(SpanStyle(color = currentColor)) { append(before) }
                 else append(before)
             }
             cursor = match.range.last + 1
-            // If it's an SGR sequence, update color; otherwise discard
             val sgrMatch = sgrRegex.matchEntire(match.value)
-            if (sgrMatch != null) {
-                currentColor = ansiCodeToColor(sgrMatch.groupValues[1])
-            }
+            if (sgrMatch != null) currentColor = ansiCodeToColor(sgrMatch.groupValues[1])
         }
         val remaining = text.substring(cursor)
         if (remaining.isNotEmpty()) {

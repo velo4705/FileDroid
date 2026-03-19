@@ -20,9 +20,15 @@ class SftpServerManager @Inject constructor() {
     private var running = false
 
     fun start(config: ServerConfig, hostKeyFile: File): Result<Unit> = runCatching {
+        // Stop any existing instance first
+        runCatching { server?.stop(true) }
+        server = null
+        running = false
+
         val sshd = SshServer.setUpDefaultServer()
         sshd.port = config.sftpPort
-        // Explicitly bind to all interfaces when no specific one is selected
+
+        // Explicitly bind to all interfaces or the selected one
         sshd.host = if (config.bindAddress.isNotBlank()) config.bindAddress else "0.0.0.0"
 
         val keyProvider = SimpleGeneratorHostKeyProvider(hostKeyFile.toPath()).apply {
@@ -40,13 +46,15 @@ class SftpServerManager @Inject constructor() {
 
         sshd.start()
 
-        // sshd.start() is non-blocking — wait until the port is actually bound (up to 5s)
+        // sshd.start() is non-blocking — poll until the port is actually bound (up to 10s)
         val bindHost = if (config.bindAddress.isNotBlank()) config.bindAddress else "0.0.0.0"
-        val deadline = System.currentTimeMillis() + 5_000
+        val deadline = System.currentTimeMillis() + 10_000
+        var bound = false
         while (System.currentTimeMillis() < deadline) {
-            if (isPortBound(bindHost, config.sftpPort)) break
-            Thread.sleep(100)
+            if (isPortBound(bindHost, config.sftpPort)) { bound = true; break }
+            Thread.sleep(200)
         }
+        if (!bound) throw IllegalStateException("SFTP server did not bind to port ${config.sftpPort} within 10s")
 
         server = sshd
         running = true
@@ -54,7 +62,7 @@ class SftpServerManager @Inject constructor() {
 
     fun stop() {
         running = false
-        server?.stop(true)
+        runCatching { server?.stop(true) }
         server = null
     }
 
@@ -64,9 +72,9 @@ class SftpServerManager @Inject constructor() {
         ServerSocket().use { s ->
             s.reuseAddress = true
             s.bind(InetSocketAddress(host, port))
-            false // bound successfully = port was free = server not listening yet
+            false // bound = port was free = server not listening yet
         }
     } catch (_: Exception) {
-        true // bind failed = port is in use = server is listening
+        true // failed to bind = port in use = server is listening
     }
 }
