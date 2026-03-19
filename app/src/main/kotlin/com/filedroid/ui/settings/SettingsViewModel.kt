@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-private const val PORT_ERROR_MSG = "Port must be between 1024 and 65535"
+private const val PORT_ERROR_MSG = "Port must be between 1 and 65535"
 
 data class SettingsUiState(
     val ftpPort: String = "2121",
@@ -22,10 +22,10 @@ data class SettingsUiState(
     val passwordSaved: Boolean = false
 )
 
-/** Returns true iff [input] represents an integer in [1024, 65535]. */
+/** Returns true iff [input] represents an integer in [1, 65535]. */
 fun isValidPort(input: String): Boolean {
     val n = input.toIntOrNull() ?: return false
-    return n in 1024..65535
+    return n in 1..65535
 }
 
 @HiltViewModel
