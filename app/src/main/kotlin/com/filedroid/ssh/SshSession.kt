@@ -55,7 +55,7 @@ class SshSession(
 
         val sess = client.startSession()
         // Explicit terminal size + disable bracketed paste mode
-        sess.allocatePTY("xterm", 220, 50, 0, 0, mapOf("TERM" to "xterm"))
+        sess.allocatePTY("xterm", 220, 50, 0, 0, emptyMap())
         val sh = sess.startShell()
 
         ssh = client
