@@ -73,6 +73,8 @@ class LocalBrowserViewModel @Inject constructor(
         return true
     }
 
+    fun canNavigateUp(): Boolean = backStack.size > 1
+
     fun navigateToTermux() {
         repo.getTermuxHome()?.let { navigateTo(it) }
     }

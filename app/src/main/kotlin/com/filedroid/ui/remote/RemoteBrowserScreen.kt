@@ -116,6 +116,13 @@ fun RemoteBrowserScreen(
                         }
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            // ".." parent directory entry
+                            if (uiState.currentPath.isNotBlank() && uiState.currentPath != "/") {
+                                item {
+                                    ParentDirRow(onClick = { viewModel.navigateUp() })
+                                    HorizontalDivider()
+                                }
+                            }
                             items(uiState.entries, key = { it.path }) { file ->
                                 RemoteFileRow(
                                     file = file,
@@ -284,4 +291,24 @@ private fun formatSize(bytes: Long): String = when {
     bytes < 1024 * 1024 -> "${bytes / 1024} KB"
     bytes < 1024 * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
     else -> "${bytes / (1024 * 1024 * 1024)} GB"
+}
+
+@Composable
+private fun ParentDirRow(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Folder,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text("..", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+    }
 }

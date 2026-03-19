@@ -114,7 +114,8 @@ fun LocalBrowserScreen(
                     },
                     onLongPress = { file -> viewModel.toggleSelection(file) },
                     onRename = { viewModel.showRename(it) },
-                    onDelete = { viewModel.showDeleteConfirm(it) }
+                    onDelete = { viewModel.showDeleteConfirm(it) },
+                    onNavigateUp = if (viewModel.canNavigateUp()) ({ viewModel.navigateUp() }) else null
                 )
             }
         }
@@ -180,9 +181,29 @@ private fun FileList(
     onEntryClick: (LocalFile) -> Unit,
     onLongPress: (LocalFile) -> Unit,
     onRename: (LocalFile) -> Unit,
-    onDelete: (LocalFile) -> Unit
+    onDelete: (LocalFile) -> Unit,
+    onNavigateUp: (() -> Unit)? = null
 ) {
     LazyColumn {
+        // ".." parent directory entry
+        if (onNavigateUp != null) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onNavigateUp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Folder, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("..", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline)
+                }
+                HorizontalDivider()
+            }
+        }
         items(entries, key = { it.path }) { file ->
             FileRow(
                 file = file,
