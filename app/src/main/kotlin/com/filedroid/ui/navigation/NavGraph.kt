@@ -1,12 +1,15 @@
 package com.filedroid.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.filedroid.ui.home.HomeScreen
 import com.filedroid.ui.local.LocalBrowserScreen
 import com.filedroid.ui.profiles.ProfileListScreen
@@ -15,6 +18,7 @@ import com.filedroid.ui.settings.FtpSettingsScreen
 import com.filedroid.ui.settings.SettingsScreen
 import com.filedroid.ui.settings.SftpSettingsScreen
 import com.filedroid.ui.theme.FileDroidTheme
+import com.filedroid.ui.theme.ThemeViewModel
 import com.filedroid.ui.server.ServerControlScreen
 import com.filedroid.ui.ssh.SshProfileListScreen
 import com.filedroid.ui.ssh.SshTerminalScreen
@@ -36,7 +40,9 @@ object Routes {
 
 @Composable
 fun FileDroidApp() {
-    FileDroidTheme {
+    val themeVm: ThemeViewModel = hiltViewModel()
+    val prefs by themeVm.prefs.collectAsState()
+    FileDroidTheme(prefs = prefs) {
         val navController = rememberNavController()
         NavGraph(navController = navController)
     }

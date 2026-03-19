@@ -1,5 +1,8 @@
 package com.filedroid.ui.remote
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,6 +29,10 @@ fun RemoteBrowserScreen(
     val profile = uiState.profile
     var newFolderName by remember { mutableStateOf("") }
     var showNewFolderDialog by remember { mutableStateOf(false) }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? -> uri?.let { viewModel.upload(it) } }
 
     // Connect on first composition
     LaunchedEffect(profileId) {
@@ -59,6 +66,9 @@ fun RemoteBrowserScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { filePicker.launch("*/*") }) {
+                        Icon(Icons.Default.Upload, contentDescription = "Upload file")
+                    }
                     IconButton(onClick = { showNewFolderDialog = true }) {
                         Icon(Icons.Default.CreateNewFolder, contentDescription = "New folder")
                     }
@@ -140,6 +150,17 @@ fun RemoteBrowserScreen(
                 Snackbar(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
                 ) { Text("Download queued → Downloads/") }
+            }
+
+            // Upload queued toast
+            if (uiState.uploadedFileName != null) {
+                LaunchedEffect(uiState.uploadedFileName) {
+                    kotlinx.coroutines.delay(2500)
+                    viewModel.clearUploadedToast()
+                }
+                Snackbar(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+                ) { Text("Uploading ${uiState.uploadedFileName}…") }
             }
         }
     }

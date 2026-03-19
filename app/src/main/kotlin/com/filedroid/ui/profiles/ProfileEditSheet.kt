@@ -26,7 +26,7 @@ fun ProfileEditSheet(
     var port by remember { mutableStateOf(profile?.port?.toString() ?: "22") }
     var username by remember { mutableStateOf(profile?.username ?: "") }
     var password by remember { mutableStateOf("") }
-    var initialPath by remember { mutableStateOf(profile?.initialRemotePath ?: "/") }
+    var initialPath by remember { mutableStateOf(profile?.initialRemotePath ?: "~") }
     var anonymous by remember { mutableStateOf(profile?.anonymous ?: false) }
     // R2.8 — private-key auth (SFTP only)
     var usePrivateKey by remember { mutableStateOf(profile?.usePrivateKey ?: false) }

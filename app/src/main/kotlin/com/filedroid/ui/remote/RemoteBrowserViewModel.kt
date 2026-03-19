@@ -1,5 +1,7 @@
 package com.filedroid.ui.remote
 
+import android.content.Context
+import android.net.Uri
 import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +14,7 @@ import com.filedroid.remote.RemoteFile
 import com.filedroid.remote.SftpClient
 import com.filedroid.transfer.TransferEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,13 +36,15 @@ data class RemoteBrowserUiState(
     val showDeleteConfirm: Boolean = false,
     val selectedFile: RemoteFile? = null,
     val showReconnectPrompt: Boolean = false,
-    val downloadedToPath: String? = null  // non-null briefly after a download completes
+    val downloadedToPath: String? = null,  // non-null briefly after a download completes
+    val uploadedFileName: String? = null   // non-null briefly after an upload is queued
 )
 
 @HiltViewModel
 class RemoteBrowserViewModel @Inject constructor(
     private val profileRepo: ConnectionProfileRepository,
-    private val transferEngine: TransferEngine
+    private val transferEngine: TransferEngine,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RemoteBrowserUiState())
@@ -173,6 +178,29 @@ class RemoteBrowserViewModel @Inject constructor(
         _uiState.update { it.copy(downloadedToPath = localPath) }
     }
 
+    /** Upload a file picked from the device to the current remote directory. */
+    fun upload(uri: Uri) {
+        val c = client ?: return
+        val fileName = uri.lastPathSegment?.substringAfterLast("/")
+            ?: uri.lastPathSegment
+            ?: "upload_${System.currentTimeMillis()}"
+        val remotePath = _uiState.value.currentPath.trimEnd('/') + "/$fileName"
+        // Copy URI to a temp file so TransferEngine can read it as a File
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val tmp = File(context.cacheDir, fileName)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    tmp.outputStream().use { input.copyTo(it) }
+                }
+                transferEngine.enqueueUpload(c, tmp.absolutePath, remotePath)
+                _uiState.update { it.copy(uploadedFileName = fileName) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Upload failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun clearUploadedToast() = _uiState.update { it.copy(uploadedFileName = null) }
     fun clearDownloadedToast() = _uiState.update { it.copy(downloadedToPath = null) }
 
     fun dismissReconnectPrompt() = _uiState.update { it.copy(showReconnectPrompt = false) }
