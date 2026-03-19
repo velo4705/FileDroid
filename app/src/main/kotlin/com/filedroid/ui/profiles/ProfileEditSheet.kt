@@ -15,6 +15,7 @@ import com.filedroid.data.Protocol
 @Composable
 fun ProfileEditSheet(
     profile: ConnectionProfile?,
+    existingPassword: String = "",   // pre-filled when editing
     onSave: (label: String, protocol: Protocol, host: String, port: Int,
              username: String, password: String, initialPath: String, anonymous: Boolean,
              usePrivateKey: Boolean, privateKey: String, passphrase: String) -> Unit,
@@ -25,12 +26,12 @@ fun ProfileEditSheet(
     var host by remember { mutableStateOf(profile?.host ?: "") }
     var port by remember { mutableStateOf(profile?.port?.toString() ?: "22") }
     var username by remember { mutableStateOf(profile?.username ?: "") }
-    var password by remember { mutableStateOf("") }
+    // Pre-fill password when editing so user doesn't have to re-enter it
+    var password by remember { mutableStateOf(existingPassword) }
     var initialPath by remember { mutableStateOf(profile?.initialRemotePath ?: "~") }
     var anonymous by remember { mutableStateOf(profile?.anonymous ?: false) }
-    // R2.8 — private-key auth (SFTP only)
     var usePrivateKey by remember { mutableStateOf(profile?.usePrivateKey ?: false) }
-    var privateKey by remember { mutableStateOf("") }
+    var privateKey by remember { mutableStateOf(if (profile?.usePrivateKey == true) existingPassword else "") }
     var passphrase by remember { mutableStateOf("") }
 
     val portError: String? = when (val n = port.toIntOrNull()) {

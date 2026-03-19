@@ -9,7 +9,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
+import android.net.Uri
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.filedroid.ui.editor.FileEditorScreen
 import com.filedroid.ui.home.HomeScreen
 import com.filedroid.ui.local.LocalBrowserScreen
 import com.filedroid.ui.profiles.ProfileListScreen
@@ -36,6 +39,8 @@ object Routes {
     const val SETTINGS = "settings"
     const val SETTINGS_FTP = "settings/ftp"
     const val SETTINGS_SFTP = "settings/sftp"
+    const val LOCAL_EDITOR  = "editor/local"   // + ?path=...&isNew=...
+    const val REMOTE_EDITOR = "editor/remote"  // + ?profileId=...&remotePath=...&isNew=...
 }
 
 @Composable
@@ -64,7 +69,14 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
             )
         }
         composable(Routes.LOCAL_BROWSER) {
-            LocalBrowserScreen(onNavigateBack = { navController.popBackStack() })
+            LocalBrowserScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenFile = { path ->
+                    navController.navigate("${Routes.LOCAL_EDITOR}?path=${Uri.encode(path)}&isNew=false")
+                },
+                onNewFile = { dir ->
+                    navController.navigate("${Routes.LOCAL_EDITOR}?path=${Uri.encode(dir)}&isNew=true")
+                }            )
         }
         composable(Routes.PROFILES) {
             ProfileListScreen(
@@ -79,7 +91,13 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
             val profileId = backStackEntry.arguments?.getLong("profileId") ?: return@composable
             RemoteBrowserScreen(
                 profileId = profileId,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onOpenFile = { path ->
+                    navController.navigate("${Routes.REMOTE_EDITOR}?profileId=$profileId&remotePath=${Uri.encode(path)}&isNew=false")
+                },
+                onNewFile = { dir ->
+                    navController.navigate("${Routes.REMOTE_EDITOR}?profileId=$profileId&remotePath=${Uri.encode(dir)}&isNew=true")
+                }
             )
         }
         composable(Routes.TRANSFERS) {
@@ -133,6 +151,27 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
         }
         composable(Routes.SETTINGS_SFTP) {
             SftpSettingsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        // Local file editor
+        composable(
+            route = "${Routes.LOCAL_EDITOR}?path={path}&isNew={isNew}",
+            arguments = listOf(
+                navArgument("path")  { type = NavType.StringType },
+                navArgument("isNew") { type = NavType.StringType; defaultValue = "false" }
+            )
+        ) {
+            FileEditorScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        // Remote file editor
+        composable(
+            route = "${Routes.REMOTE_EDITOR}?profileId={profileId}&remotePath={remotePath}&isNew={isNew}",
+            arguments = listOf(
+                navArgument("profileId")   { type = NavType.StringType },
+                navArgument("remotePath")  { type = NavType.StringType },
+                navArgument("isNew")       { type = NavType.StringType; defaultValue = "false" }
+            )
+        ) {
+            FileEditorScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

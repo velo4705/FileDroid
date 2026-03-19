@@ -26,6 +26,7 @@ fun ProfileListScreen(
 ) {
     val profiles by viewModel.profiles.collectAsState()
     var editTarget by remember { mutableStateOf<ConnectionProfile?>(null) }
+    var editPassword by remember { mutableStateOf("") }
     var showSheet by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -55,7 +56,11 @@ fun ProfileListScreen(
                     ProfileRow(
                         profile = profile,
                         onClick = { onConnect(profile.id) },
-                        onEdit = { editTarget = profile; showSheet = true },
+                        onEdit = {
+                            editTarget = profile
+                            editPassword = viewModel.getPassword(profile)
+                            showSheet = true
+                        },
                         onDelete = { viewModel.delete(profile) }
                     )
                     HorizontalDivider()
@@ -67,6 +72,7 @@ fun ProfileListScreen(
     if (showSheet) {
         ProfileEditSheet(
             profile = editTarget,
+            existingPassword = editPassword,
             onSave = { label, protocol, host, port, user, pass, path, anon, useKey, key, phrase ->
                 viewModel.save(
                     id = editTarget?.id ?: 0,
@@ -74,9 +80,9 @@ fun ProfileListScreen(
                     username = user, password = pass, initialPath = path, anonymous = anon,
                     usePrivateKey = useKey, privateKey = key, passphrase = phrase
                 )
-                showSheet = false; editTarget = null
+                showSheet = false; editTarget = null; editPassword = ""
             },
-            onDismiss = { showSheet = false; editTarget = null }
+            onDismiss = { showSheet = false; editTarget = null; editPassword = "" }
         )
     }
 }

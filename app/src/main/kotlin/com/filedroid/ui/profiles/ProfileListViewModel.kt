@@ -51,4 +51,7 @@ class ProfileListViewModel @Inject constructor(
     fun delete(profile: ConnectionProfile) {
         viewModelScope.launch { repo.delete(profile) }
     }
+
+    fun getPassword(profile: ConnectionProfile): String =
+        repo.getPassword(profile) ?: ""
 }

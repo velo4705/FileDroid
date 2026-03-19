@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
@@ -41,12 +42,15 @@ import java.util.*
 @Composable
 fun LocalBrowserScreen(
     onNavigateBack: () -> Unit,
+    onOpenFile: (path: String) -> Unit = {},
+    onNewFile: (dir: String) -> Unit = {},
     viewModel: LocalBrowserViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val inSelectionMode = uiState.selectedPaths.isNotEmpty()
     var searchActive by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
+    var showNewFileDialog by remember { mutableStateOf(false) }
 
     // Filter entries by search query
     val displayedEntries = remember(uiState.entries, uiState.searchQuery) {
@@ -108,7 +112,9 @@ fun LocalBrowserScreen(
                         IconButton(onClick = { viewModel.showCreateFolder() }) {
                             Icon(Icons.Default.CreateNewFolder, contentDescription = "New folder")
                         }
-                    }
+                        IconButton(onClick = { showNewFileDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "New file")
+                        }                    }
                 )
             }
         },
@@ -134,6 +140,7 @@ fun LocalBrowserScreen(
                     onEntryClick = { file ->
                         if (inSelectionMode) viewModel.toggleSelection(file)
                         else if (file.isDirectory) viewModel.navigateTo(file.file)
+                        else onOpenFile(file.path)
                     },
                     onLongPress = { file -> viewModel.toggleSelection(file) },
                     onRename = { viewModel.showRename(it) },
@@ -180,6 +187,18 @@ fun LocalBrowserScreen(
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissDialogs() }) { Text("Cancel") }
             }
+        )
+    }
+
+    if (showNewFileDialog) {
+        InputDialog(
+            title = "New File",
+            label = "File name",
+            onConfirm = { name ->
+                showNewFileDialog = false
+                onNewFile("${uiState.currentPath.trimEnd('/')}/$name")
+            },
+            onDismiss = { showNewFileDialog = false }
         )
     }
 }

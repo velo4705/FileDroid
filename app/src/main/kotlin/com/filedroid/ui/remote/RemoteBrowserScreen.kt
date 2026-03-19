@@ -25,6 +25,8 @@ import com.filedroid.remote.RemoteFile
 fun RemoteBrowserScreen(
     profileId: Long,
     onNavigateBack: () -> Unit,
+    onOpenFile: (path: String) -> Unit = {},
+    onNewFile: (dir: String) -> Unit = {},
     viewModel: RemoteBrowserViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -34,6 +36,7 @@ fun RemoteBrowserScreen(
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
+    var showNewFileDialog by remember { mutableStateOf(false) }
 
     val displayedEntries = remember(uiState.entries, searchQuery) {
         if (searchQuery.isBlank()) uiState.entries
@@ -123,6 +126,9 @@ fun RemoteBrowserScreen(
                         IconButton(onClick = { showNewFolderDialog = true }) {
                             Icon(Icons.Default.FolderOpen, contentDescription = "New folder")
                         }
+                        IconButton(onClick = { showNewFileDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "New file")
+                        }
                         IconButton(onClick = { viewModel.navigateTo(uiState.currentPath) }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                         }
@@ -188,6 +194,7 @@ fun RemoteBrowserScreen(
                                     file = file,
                                     onClick = {
                                         if (file.isDirectory) viewModel.navigateTo(file.path)
+                                        else onOpenFile(file.path)
                                     },
                                     onDownload = { viewModel.download(file) },
                                     onRename = { viewModel.showRename(file) },
@@ -302,6 +309,30 @@ fun RemoteBrowserScreen(
                 ) { Text("Create") }
             },
             dismissButton = { TextButton(onClick = { showNewFolderDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    // New file dialog
+    if (showNewFileDialog) {
+        var newFileName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNewFileDialog = false },
+            title = { Text("New File") },
+            text = {
+                OutlinedTextField(value = newFileName, onValueChange = { newFileName = it },
+                    label = { Text("File name") }, singleLine = true)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showNewFileDialog = false
+                        val path = "${uiState.currentPath.trimEnd('/')}/$newFileName"
+                        onNewFile(path)
+                    },
+                    enabled = newFileName.isNotBlank()
+                ) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { showNewFileDialog = false }) { Text("Cancel") } }
         )
     }
 }
