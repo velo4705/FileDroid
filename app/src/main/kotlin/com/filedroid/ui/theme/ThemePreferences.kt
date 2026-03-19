@@ -10,6 +10,10 @@ enum class AccentColor(
     val lightContainer: Color,
     val dark: Color,
     val darkContainer: Color,
+    /** Text color on top of [light] — white for dark primaries, near-black for light ones */
+    val onLight: Color = Color.White,
+    /** Text color on top of [dark] — dark for light primaries */
+    val onDark: Color = Color(0xFF1C1C1E),
 ) {
     BLUE("Blue",
         light = Color(0xFF1565C0), lightContainer = Color(0xFFD0E4FF),
@@ -34,7 +38,8 @@ enum class AccentColor(
         dark  = Color(0xFFF48FB1), darkContainer  = Color(0xFF5C0A2E)),
     YELLOW("Yellow",
         light = Color(0xFFF57F17), lightContainer = Color(0xFFFFF3C4),
-        dark  = Color(0xFFFFF176), darkContainer  = Color(0xFF5C3D00)),
+        dark  = Color(0xFFFFF176), darkContainer  = Color(0xFF5C3D00),
+        onLight = Color(0xFF1C1C1E)),  // yellow is light — dark text on it
 }
 
 enum class FontSize(val label: String, val scale: Float) {

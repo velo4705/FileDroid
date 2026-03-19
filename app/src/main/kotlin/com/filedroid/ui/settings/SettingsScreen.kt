@@ -25,7 +25,7 @@ fun SettingsScreen(
     onNavigateToSftp: () -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
-    themeVm: ThemeViewModel = hiltViewModel()
+    themeVm: ThemeViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val prefs by themeVm.prefs.collectAsState()

@@ -3,6 +3,7 @@ package com.filedroid
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.filedroid.security.CredentialKeys
 import com.filedroid.security.CredentialStore
 import com.filedroid.ui.navigation.FileDroidApp
+import com.filedroid.ui.theme.ThemeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -20,10 +22,12 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var credentialStore: CredentialStore
 
+    // Single activity-scoped ThemeViewModel — shared across all screens
+    private val themeViewModel: ThemeViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // R7.3 — prompt to set server password on first launch
             var showPasswordSetup by remember {
                 mutableStateOf(!credentialStore.hasServerPassword())
             }
@@ -37,7 +41,7 @@ class MainActivity : ComponentActivity() {
                     onSkip = { showPasswordSetup = false }
                 )
             } else {
-                FileDroidApp()
+                FileDroidApp(themeViewModel = themeViewModel)
             }
         }
     }

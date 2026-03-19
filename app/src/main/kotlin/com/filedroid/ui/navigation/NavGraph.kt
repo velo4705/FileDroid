@@ -39,17 +39,16 @@ object Routes {
 }
 
 @Composable
-fun FileDroidApp() {
-    val themeVm: ThemeViewModel = hiltViewModel()
-    val prefs by themeVm.prefs.collectAsState()
+fun FileDroidApp(themeViewModel: ThemeViewModel) {
+    val prefs by themeViewModel.prefs.collectAsState()
     FileDroidTheme(prefs = prefs) {
         val navController = rememberNavController()
-        NavGraph(navController = navController)
+        NavGraph(navController = navController, themeViewModel = themeViewModel)
     }
 }
 
 @Composable
-fun NavGraph(navController: NavHostController) {
+fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
     NavHost(
         navController = navController,
         startDestination = Routes.HOME
@@ -125,7 +124,8 @@ fun NavGraph(navController: NavHostController) {
             SettingsScreen(
                 onNavigateToFtp = { navController.navigate(Routes.SETTINGS_FTP) },
                 onNavigateToSftp = { navController.navigate(Routes.SETTINGS_SFTP) },
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                themeVm = themeViewModel
             )
         }
         composable(Routes.SETTINGS_FTP) {
