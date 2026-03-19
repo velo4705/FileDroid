@@ -76,13 +76,21 @@ class ServerForegroundService : Service() {
     }
 
     private fun startServers(config: ServerConfig) {
-        activeConfig = config
-        if (config.ftpEnabled) ftpManager.start(config)
-        if (config.sftpEnabled) {
-            val keyFile = File(filesDir, "host_key.ser")
-            sftpManager.start(config, keyFile)
+        // Fall back to external storage root if no root path was configured
+        val resolvedRoot = config.rootPath.ifBlank {
+            android.os.Environment.getExternalStorageDirectory().absolutePath
         }
-        startForeground(NOTIF_ID, buildNotification(config))
+        val resolved = config.copy(rootPath = resolvedRoot)
+        activeConfig = resolved
+
+        // Must call startForeground before any heavy work on Android 8+
+        startForeground(NOTIF_ID, buildNotification(resolved))
+
+        if (resolved.ftpEnabled) ftpManager.start(resolved).onFailure { stopSelf() }
+        if (resolved.sftpEnabled) {
+            val keyFile = File(filesDir, "host_key.ser")
+            sftpManager.start(resolved, keyFile).onFailure { stopSelf() }
+        }
     }
 
     private fun stopServers() {
@@ -152,6 +160,7 @@ private fun ServerConfig.toBundle() = android.os.Bundle().apply {
     putBoolean("ftpEnabled", ftpEnabled); putBoolean("sftpEnabled", sftpEnabled)
     putBoolean("anonymousEnabled", anonymousEnabled)
     putInt("maxSessions", maxSessions); putInt("idleTimeout", idleTimeoutSeconds)
+    putString("bindAddress", bindAddress)
 }
 
 private fun android.os.Bundle.toServerConfig() = ServerConfig(
@@ -160,5 +169,6 @@ private fun android.os.Bundle.toServerConfig() = ServerConfig(
     password = getString("password", ""),
     ftpEnabled = getBoolean("ftpEnabled"), sftpEnabled = getBoolean("sftpEnabled"),
     anonymousEnabled = getBoolean("anonymousEnabled"),
-    maxSessions = getInt("maxSessions", 5), idleTimeoutSeconds = getInt("idleTimeout", 300)
+    maxSessions = getInt("maxSessions", 5), idleTimeoutSeconds = getInt("idleTimeout", 300),
+    bindAddress = getString("bindAddress", "")
 )

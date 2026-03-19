@@ -8,15 +8,20 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 
 // Neutral surface colors — same for all accents
 private val SurfaceLight   = Color(0xFFF8F9FA)
 private val SurfaceDark    = Color(0xFF1C1C1E)
 private val BackgroundLight = Color(0xFFFFFFFF)
 private val BackgroundDark  = Color(0xFF121212)
+private val BackgroundAmoled = Color(0xFF000000)
+private val SurfaceAmoled   = Color(0xFF0A0A0A)
 
 @Composable
 fun FileDroidTheme(
@@ -24,20 +29,40 @@ fun FileDroidTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
+    val systemDark = isSystemInDarkTheme()
 
     val colorScheme = when (prefs.mode) {
         ThemeMode.MATERIAL_YOU -> {
             if (Build.VERSION.SDK_INT >= 31) {
-                // Use system wallpaper-derived colors; respect system dark mode
-                if (isSystemInDarkTheme()) dynamicDarkColorScheme(context)
+                if (systemDark) dynamicDarkColorScheme(context)
                 else dynamicLightColorScheme(context)
             } else {
-                // Fallback to blue accent on older devices
-                buildColorScheme(AccentColor.BLUE, dark = false)
+                buildColorScheme(prefs.accent, dark = false)
             }
         }
+        ThemeMode.SYSTEM -> {
+            if (systemDark) buildColorScheme(prefs.accent, dark = true)
+            else buildColorScheme(prefs.accent, dark = false)
+        }
+        ThemeMode.AMOLED -> buildColorScheme(prefs.accent, dark = true).copy(
+            background = BackgroundAmoled,
+            surface    = SurfaceAmoled,
+        )
         ThemeMode.DARK  -> buildColorScheme(prefs.accent, dark = true)
         ThemeMode.LIGHT -> buildColorScheme(prefs.accent, dark = false)
+    }
+
+    // Make status bar and nav bar match the app background (edge-to-edge)
+    val view = LocalView.current
+    val isDark = prefs.mode == ThemeMode.DARK || prefs.mode == ThemeMode.AMOLED ||
+        (prefs.mode == ThemeMode.SYSTEM && systemDark) ||
+        (prefs.mode == ThemeMode.MATERIAL_YOU && systemDark)
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDark
+        }
     }
 
     val typography = FileDroidTypography.run {

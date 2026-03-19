@@ -204,5 +204,7 @@ private fun SettingsDropdown(
 private fun ThemeMode.label() = when (this) {
     ThemeMode.LIGHT        -> "Light"
     ThemeMode.DARK         -> "Dark"
+    ThemeMode.AMOLED       -> "AMOLED Black"
+    ThemeMode.SYSTEM       -> "System"
     ThemeMode.MATERIAL_YOU -> "Material You"
 }

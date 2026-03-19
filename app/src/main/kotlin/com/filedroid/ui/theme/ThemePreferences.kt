@@ -2,7 +2,7 @@ package com.filedroid.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-enum class ThemeMode { LIGHT, DARK, MATERIAL_YOU }
+enum class ThemeMode { LIGHT, DARK, AMOLED, SYSTEM, MATERIAL_YOU }
 
 enum class AccentColor(
     val label: String,
@@ -39,7 +39,30 @@ enum class AccentColor(
     YELLOW("Yellow",
         light = Color(0xFFF57F17), lightContainer = Color(0xFFFFF3C4),
         dark  = Color(0xFFFFF176), darkContainer  = Color(0xFF5C3D00),
-        onLight = Color(0xFF1C1C1E)),  // yellow is light — dark text on it
+        onLight = Color(0xFF1C1C1E)),
+    CYAN("Cyan",
+        light = Color(0xFF00838F), lightContainer = Color(0xFFB2EBF2),
+        dark  = Color(0xFF80DEEA), darkContainer  = Color(0xFF003D47)),
+    INDIGO("Indigo",
+        light = Color(0xFF283593), lightContainer = Color(0xFFD5D9FF),
+        dark  = Color(0xFF9FA8DA), darkContainer  = Color(0xFF0D1A5C)),
+    LIME("Lime",
+        light = Color(0xFF558B2F), lightContainer = Color(0xFFDCEDC8),
+        dark  = Color(0xFFAED581), darkContainer  = Color(0xFF2A4A10),
+        onLight = Color(0xFF1C1C1E)),
+    ROSE("Rose",
+        light = Color(0xFFB71C1C), lightContainer = Color(0xFFFFCDD2),
+        dark  = Color(0xFFFF8A80), darkContainer  = Color(0xFF5C0A0A)),
+    AMBER("Amber",
+        light = Color(0xFFFF6F00), lightContainer = Color(0xFFFFECB3),
+        dark  = Color(0xFFFFD54F), darkContainer  = Color(0xFF5C3600),
+        onLight = Color(0xFF1C1C1E)),
+    DEEP_PURPLE("Deep Purple",
+        light = Color(0xFF4527A0), lightContainer = Color(0xFFEDE7F6),
+        dark  = Color(0xFFB39DDB), darkContainer  = Color(0xFF1A0A5C)),
+    BROWN("Brown",
+        light = Color(0xFF4E342E), lightContainer = Color(0xFFD7CCC8),
+        dark  = Color(0xFFBCAAA4), darkContainer  = Color(0xFF2A1A16)),
 }
 
 enum class FontSize(val label: String, val scale: Float) {
