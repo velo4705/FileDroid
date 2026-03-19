@@ -7,6 +7,8 @@ import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import java.io.File
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.nio.file.Paths
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,6 +41,14 @@ class SftpServerManager @Inject constructor() {
         sshd.fileSystemFactory = VirtualFileSystemFactory(Paths.get(config.rootPath))
 
         sshd.start()
+
+        // sshd.start() is non-blocking — wait until the port is actually bound (up to 5s)
+        val deadline = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < deadline) {
+            if (isPortBound(config.sftpPort)) break
+            Thread.sleep(100)
+        }
+
         server = sshd
         running = true
     }
@@ -50,4 +60,14 @@ class SftpServerManager @Inject constructor() {
     }
 
     fun isRunning(): Boolean = running && server != null && !server!!.isClosed
+
+    private fun isPortBound(port: Int): Boolean = try {
+        ServerSocket().use { s ->
+            s.reuseAddress = true
+            s.bind(InetSocketAddress(port))
+            false // bound successfully = port was free = server not listening yet
+        }
+    } catch (_: Exception) {
+        true // bind failed = port is in use = server is listening
+    }
 }

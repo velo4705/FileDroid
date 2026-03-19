@@ -253,23 +253,32 @@ private fun ConnectDialog(
     )
 }
 
-/** Minimal ANSI SGR escape parser → AnnotatedString with colors. */
+/** Strip all ANSI/VT escape sequences and parse SGR color codes → AnnotatedString. */
 private fun parseAnsi(raw: String): AnnotatedString {
-    // Strip carriage returns for cleaner display
     val text = raw.replace("\r\n", "\n").replace("\r", "\n")
     return buildAnnotatedString {
-        val ansiRegex = Regex("\u001B\\[(\\d*(?:;\\d+)*)m")
-        var cursor = 0
+        // Match any ESC sequence: ESC [ ... (CSI), ESC ] ... (OSC), ESC . (2-char)
+        val escRegex = Regex("\u001B(?:\\[[0-9;]*[A-Za-z]|\\][^\u0007]*(?:\u0007|\u001B\\\\)|[^\\[\\]])")
+        // Only keep SGR color sequences (ESC [ ... m) for coloring, strip everything else
+        val sgrRegex = Regex("\u001B\\[([0-9;]*)m")
         var currentColor: Color? = null
+        var cursor = 0
 
-        for (match in ansiRegex.findAll(text)) {
+        // Find all escape sequences in order
+        val allEscapes = escRegex.findAll(text).toList()
+        for (match in allEscapes) {
+            // Append plain text before this escape
             val before = text.substring(cursor, match.range.first)
             if (before.isNotEmpty()) {
                 if (currentColor != null) withStyle(SpanStyle(color = currentColor)) { append(before) }
                 else append(before)
             }
             cursor = match.range.last + 1
-            currentColor = ansiCodeToColor(match.groupValues[1])
+            // If it's an SGR sequence, update color; otherwise discard
+            val sgrMatch = sgrRegex.matchEntire(match.value)
+            if (sgrMatch != null) {
+                currentColor = ansiCodeToColor(sgrMatch.groupValues[1])
+            }
         }
         val remaining = text.substring(cursor)
         if (remaining.isNotEmpty()) {

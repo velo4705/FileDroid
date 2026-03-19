@@ -59,12 +59,19 @@ class ServerViewModel @Inject constructor(
     }
 
     fun refresh() {
-        _uiState.update {
-            it.copy(
-                ftpRunning = ftpManager.isRunning(),
-                sftpRunning = sftpManager.isRunning(),
-                availableInterfaces = loadNetworkInterfaces()
-            )
+        // Only sync from managers if we think nothing is running — avoids overwriting
+        // optimistic state before the async server start coroutine completes
+        val current = _uiState.value
+        if (!current.ftpRunning && !current.sftpRunning) {
+            _uiState.update {
+                it.copy(
+                    ftpRunning = ftpManager.isRunning(),
+                    sftpRunning = sftpManager.isRunning(),
+                    availableInterfaces = loadNetworkInterfaces()
+                )
+            }
+        } else {
+            _uiState.update { it.copy(availableInterfaces = loadNetworkInterfaces()) }
         }
     }
 
