@@ -1,14 +1,16 @@
 package com.filedroid.ui.settings
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.filedroid.ui.theme.AccentColor
@@ -22,9 +24,12 @@ fun SettingsScreen(
     onNavigateToFtp: () -> Unit,
     onNavigateToSftp: () -> Unit,
     onNavigateBack: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel(),
     themeVm: ThemeViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     val prefs by themeVm.prefs.collectAsState()
+    var showPassword by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -42,60 +47,129 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Appearance section
-            Text(
-                "Appearance",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-
-            // 1. Theme mode
-            SettingsDropdown(
-                label = "Theme",
-                options = ThemeMode.entries.map { it.label() },
-                selected = prefs.mode.label(),
-                onSelect = { idx -> themeVm.setMode(ThemeMode.entries[idx]) }
-            )
-            HorizontalDivider()
-
-            // 2. Accent color (hidden for Material You)
-            if (prefs.mode != ThemeMode.MATERIAL_YOU) {
-                SettingsDropdown(
-                    label = "Accent Color",
-                    options = AccentColor.entries.map { it.label },
-                    selected = prefs.accent.label,
-                    onSelect = { idx -> themeVm.setAccent(AccentColor.entries[idx]) }
-                )
-                HorizontalDivider()
+            // ── Appearance ──────────────────────────────────────────────
+            SectionLabel("Appearance")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SettingsDropdown(
+                        label = "Theme",
+                        options = ThemeMode.entries.map { it.label() },
+                        selected = prefs.mode.label(),
+                        onSelect = { themeVm.setMode(ThemeMode.entries[it]) }
+                    )
+                    if (prefs.mode != ThemeMode.MATERIAL_YOU) {
+                        HorizontalDivider()
+                        SettingsDropdown(
+                            label = "Accent Color",
+                            options = AccentColor.entries.map { it.label },
+                            selected = prefs.accent.label,
+                            onSelect = { themeVm.setAccent(AccentColor.entries[it]) }
+                        )
+                    }
+                    HorizontalDivider()
+                    SettingsDropdown(
+                        label = "Font Size",
+                        options = FontSize.entries.map { it.label },
+                        selected = prefs.fontSize.label,
+                        onSelect = { themeVm.setFontSize(FontSize.entries[it]) }
+                    )
+                }
             }
 
-            // 3. Font size
-            SettingsDropdown(
-                label = "Font Size",
-                options = FontSize.entries.map { it.label },
-                selected = prefs.fontSize.label,
-                onSelect = { idx -> themeVm.setFontSize(FontSize.entries[idx]) }
-            )
-            HorizontalDivider()
+            // ── Server Credentials ───────────────────────────────────────
+            SectionLabel("Server Credentials")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Used when clients connect to FileDroid's FTP/SFTP server.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline)
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Server",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            SettingsItem(label = "FTP Settings", onClick = onNavigateToFtp)
-            HorizontalDivider()
-            SettingsItem(label = "SFTP Settings", onClick = onNavigateToSftp)
-            HorizontalDivider()
+                    OutlinedTextField(
+                        value = uiState.serverUsername,
+                        onValueChange = { viewModel.updateServerUsername(it) },
+                        label = { Text("Username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = uiState.serverPassword,
+                        onValueChange = { viewModel.updateServerPassword(it) },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = if (showPassword) VisualTransformation.None
+                                               else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            TextButton(onClick = { showPassword = !showPassword }) {
+                                Text(if (showPassword) "Hide" else "Show",
+                                    style = MaterialTheme.typography.labelSmall)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = uiState.serverRootPath,
+                        onValueChange = { viewModel.updateServerRootPath(it) },
+                        label = { Text("Root path") },
+                        placeholder = { Text("/storage/emulated/0") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { viewModel.saveServerCredentials() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Save") }
+
+                    if (uiState.passwordSaved) {
+                        Text("Saved.", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+
+            // ── Server Ports ─────────────────────────────────────────────
+            SectionLabel("Server Ports")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = uiState.ftpPort,
+                        onValueChange = { viewModel.updateFtpPort(it) },
+                        label = { Text("FTP Port") },
+                        isError = uiState.ftpPortError != null,
+                        supportingText = uiState.ftpPortError?.let { { Text(it) } },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = uiState.sftpPort,
+                        onValueChange = { viewModel.updateSftpPort(it) },
+                        label = { Text("SFTP Port") },
+                        isError = uiState.sftpPortError != null,
+                        supportingText = uiState.sftpPortError?.let { { Text(it) } },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { viewModel.savePorts() },
+                        enabled = uiState.ftpPortError == null && uiState.sftpPortError == null,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Save Ports") }
+                }
+            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary)
+}
+
 @Composable
 private fun SettingsDropdown(
     label: String,
@@ -105,17 +179,16 @@ private fun SettingsDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = true }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(label, style = MaterialTheme.typography.bodyMedium)
         Box {
-            Text(selected, style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary)
+            TextButton(onClick = { expanded = true }) {
+                Text(selected, style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary)
+            }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEachIndexed { idx, option ->
                     DropdownMenuItem(
@@ -128,23 +201,8 @@ private fun SettingsDropdown(
     }
 }
 
-@Composable
-private fun SettingsItem(label: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 18.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = label, style = MaterialTheme.typography.bodyLarge)
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-    }
-}
-
 private fun ThemeMode.label() = when (this) {
-    ThemeMode.LIGHT       -> "Light"
-    ThemeMode.DARK        -> "Dark"
+    ThemeMode.LIGHT        -> "Light"
+    ThemeMode.DARK         -> "Dark"
     ThemeMode.MATERIAL_YOU -> "Material You"
 }
