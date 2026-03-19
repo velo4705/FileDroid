@@ -34,7 +34,8 @@ class MainActivity : ComponentActivity() {
 
             if (showPasswordSetup) {
                 FirstLaunchPasswordDialog(
-                    onSet = { password ->
+                    onSet = { username, password ->
+                        credentialStore.putString("server_username", username)
                         credentialStore.putString(CredentialKeys.SERVER_PASSWORD, password)
                         showPasswordSetup = false
                     },
@@ -49,21 +50,29 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun FirstLaunchPasswordDialog(
-    onSet: (String) -> Unit,
+    onSet: (String, String) -> Unit,
     onSkip: () -> Unit
 ) {
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     val mismatch = confirm.isNotEmpty() && password != confirm
 
     AlertDialog(
-        onDismissRequest = {},  // not dismissible — must choose
-        title = { Text("Set Server Password") },
+        onDismissRequest = {},
+        title = { Text("Set Server Credentials") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Set a password for the FTP/SFTP server before anyone can connect to your device.",
+                    "Set credentials for the FTP/SFTP server so other devices can connect to yours.",
                     style = MaterialTheme.typography.bodyMedium
+                )
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = password,
@@ -87,9 +96,9 @@ private fun FirstLaunchPasswordDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onSet(password) },
-                enabled = password.isNotBlank() && password == confirm
-            ) { Text("Set Password") }
+                onClick = { onSet(username, password) },
+                enabled = username.isNotBlank() && password.isNotBlank() && password == confirm
+            ) { Text("Set Credentials") }
         },
         dismissButton = {
             TextButton(onClick = onSkip) { Text("Skip") }
