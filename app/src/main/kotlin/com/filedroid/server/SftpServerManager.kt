@@ -1,14 +1,17 @@
 package com.filedroid.server
 
-import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
+import org.apache.sshd.common.file.FileSystemFactory
 import org.apache.sshd.common.keyprovider.KeyPairProvider
+import org.apache.sshd.common.session.SessionContext
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import java.io.File
 import java.net.InetSocketAddress
+import java.net.NetworkInterface
 import java.net.ServerSocket
+import java.nio.file.FileSystems
 import java.nio.file.Paths
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -52,15 +55,12 @@ class SftpServerManager @Inject constructor() {
         val rootPath = config.rootPath.ifBlank {
             android.os.Environment.getExternalStorageDirectory().absolutePath
         }
-        val rootNio = Paths.get(rootPath)
 
-        // VirtualFileSystemFactory with both defaultHomeDir AND per-user entry set,
-        // so getUserHomeDir(session) can never return null for our user.
-        val fsFactory = org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory().apply {
-            defaultHomeDir = rootNio
-            setUserHomeDir(config.username, rootNio)
+        // Implement FileSystemFactory directly — returns the native FS, bypassing
+        // VirtualFileSystemFactory and its getUserHomeDir/ValidateUtils chain entirely.
+        sshd.fileSystemFactory = FileSystemFactory { _: SessionContext ->
+            FileSystems.getDefault()
         }
-        sshd.fileSystemFactory = fsFactory
         sshd.subsystemFactories = listOf(SftpSubsystemFactory())
 
         sshd.start()
