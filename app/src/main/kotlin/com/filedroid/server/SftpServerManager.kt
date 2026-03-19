@@ -47,7 +47,11 @@ class SftpServerManager @Inject constructor() {
         val rootPath = config.rootPath.ifBlank {
             android.os.Environment.getExternalStorageDirectory().absolutePath
         }
-        sshd.fileSystemFactory = VirtualFileSystemFactory(Paths.get(rootPath))
+        val rootNio = Paths.get(rootPath)
+        sshd.fileSystemFactory = VirtualFileSystemFactory(rootNio).apply {
+            // MINA requires a per-user home dir — set it explicitly to the same root
+            setUserHomeDir(config.username, rootNio)
+        }
 
         sshd.start()
 

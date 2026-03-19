@@ -35,6 +35,9 @@ class SshSession(val id: String, val label: String) {
     private val _output = MutableSharedFlow<String>(replay = 512, extraBufferCapacity = 1024)
     val output: SharedFlow<String> = _output.asSharedFlow()
 
+    // Last command sent (without trailing newline) — used to strip echo from output
+    @Volatile private var lastSent: String = ""
+
     var isConnected = false
         private set
 
@@ -63,14 +66,42 @@ class SshSession(val id: String, val label: String) {
         stdin = sh.outputStream
         isConnected = true
 
+        // Send stty -echo to suppress shell-level line echo, then a sentinel so we know
+        // when the shell has processed it and we can start showing output to the user.
+        val sentinel = "__FILEDROID_READY__"
+        sh.outputStream.write("stty -echo; echo $sentinel\n".toByteArray(Charsets.UTF_8))
+        sh.outputStream.flush()
+
         // Read loop runs in the session scope — tied to this session's lifetime
         readJob = scope.launch {
             val buf = ByteArray(4096)
+            val initBuf = StringBuilder()
+            var ready = false
             try {
                 while (isConnected) {
                     val n = withContext(Dispatchers.IO) { sh.inputStream.read(buf) }
                     if (n == -1) break
-                    _output.emit(String(buf, 0, n, Charsets.UTF_8))
+                    val chunk = String(buf, 0, n, Charsets.UTF_8)
+                    if (!ready) {
+                        // Swallow everything until we see the sentinel line
+                        initBuf.append(chunk)
+                        val combined = initBuf.toString()
+                        val idx = combined.indexOf(sentinel)
+                        if (idx != -1) {
+                            ready = true
+                            // Emit anything that came after the sentinel on the same read
+                            val after = combined.substring(idx + sentinel.length)
+                                .trimStart('\r', '\n')
+                            if (after.isNotEmpty()) _output.emit(after)
+                        }
+                    } else {
+                        // Strip any line that is just the echoed command we sent
+                        val filtered = if (lastSent.isNotEmpty()) {
+                            chunk.replace(lastSent + "\r\n", "")
+                                 .replace(lastSent + "\n", "")
+                        } else chunk
+                        if (filtered.isNotEmpty()) _output.emit(filtered)
+                    }
                 }
             } catch (_: Exception) { }
             finally {
@@ -98,6 +129,7 @@ class SshSession(val id: String, val label: String) {
     }
 
     fun send(text: String) {
+        lastSent = text.trimEnd('\n', '\r')
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
