@@ -15,42 +15,39 @@ import javax.inject.Singleton
 class SftpServerManager @Inject constructor() {
 
     private var server: SshServer? = null
+    private var running = false
 
     fun start(config: ServerConfig, hostKeyFile: File): Result<Unit> = runCatching {
         val sshd = SshServer.setUpDefaultServer()
         sshd.port = config.sftpPort
 
-        // R7.4 — bind to selected network interface (empty = all interfaces)
         if (config.bindAddress.isNotBlank()) {
             sshd.host = config.bindAddress
         }
 
-        // R7.2 — enforce minimum 2048-bit RSA host key
         val keyProvider = SimpleGeneratorHostKeyProvider(hostKeyFile.toPath()).apply {
             algorithm = KeyPairProvider.SSH_RSA
-            keySize = 2048  // minimum; existing keys ≥2048 are reused as-is
+            keySize = 2048
         }
         sshd.keyPairProvider = keyProvider
 
-        // Password auth
         sshd.passwordAuthenticator = PasswordAuthenticator { username, password, _ ->
             username == config.username && password == config.password
         }
 
-        // SFTP subsystem
         sshd.subsystemFactories = listOf(SftpSubsystemFactory())
-
-        // Virtual filesystem rooted at config.rootPath
         sshd.fileSystemFactory = VirtualFileSystemFactory(Paths.get(config.rootPath))
 
         sshd.start()
         server = sshd
+        running = true
     }
 
     fun stop() {
+        running = false
         server?.stop(true)
         server = null
     }
 
-    fun isRunning(): Boolean = server != null && server!!.let { !it.isClosed && !it.isClosing }
+    fun isRunning(): Boolean = running && server != null && !server!!.isClosed
 }

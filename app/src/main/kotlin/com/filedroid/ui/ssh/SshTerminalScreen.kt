@@ -176,7 +176,7 @@ private fun TerminalPane(
             }
         }
 
-        // Input row
+        // Input row — characters sent immediately as typed for real terminal feel
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -186,7 +186,13 @@ private fun TerminalPane(
         ) {
             BasicTextField(
                 value = input,
-                onValueChange = { input = it },
+                onValueChange = { new ->
+                    // Send the diff (newly typed characters) immediately
+                    if (new.length > input.length) {
+                        onSend(new.substring(input.length))
+                    }
+                    input = new
+                },
                 textStyle = androidx.compose.ui.text.TextStyle(
                     color = Color.White,
                     fontFamily = FontFamily.Monospace,
@@ -194,7 +200,7 @@ private fun TerminalPane(
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
-                    onSend(input + "\n")
+                    onSend("\n")
                     input = ""
                 }),
                 modifier = Modifier.weight(1f),
