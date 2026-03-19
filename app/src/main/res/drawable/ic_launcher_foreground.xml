@@ -5,48 +5,61 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Folder body -->
-    <path
-        android:fillColor="#166534"
-        android:pathData="M14,58 Q14,52 20,52 L36,52 Q39,52 41,50 L43,48 Q45,46 48,46 L88,46 Q94,46 94,52 L94,84 Q94,90 88,90 L20,90 Q14,90 14,84 Z"/>
+    <!--
+        Scale artwork to ~67% and center it within the 108x108 canvas.
+        This keeps everything inside the adaptive icon safe zone.
+        translateX/Y shifts the scaled content back to center.
+    -->
+    <group
+        android:scaleX="0.67"
+        android:scaleY="0.67"
+        android:translateX="17.82"
+        android:translateY="17.82">
 
-    <!-- Folder tab highlight -->
-    <path
-        android:fillColor="#16A34A"
-        android:pathData="M14,58 L94,58 L94,52 Q94,46 88,46 L48,46 Q45,46 43,48 L41,50 Q39,52 36,52 L20,52 Q14,52 14,58 Z"/>
+        <!-- Folder body -->
+        <path
+            android:fillColor="#166534"
+            android:pathData="M14,58 Q14,52 20,52 L36,52 Q39,52 41,50 L43,48 Q45,46 48,46 L88,46 Q94,46 94,52 L94,84 Q94,90 88,90 L20,90 Q14,90 14,84 Z"/>
 
-    <!-- UP arrow shaft (light mint) — x=38 -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#86EFAC"
-        android:strokeWidth="7"
-        android:strokeLineCap="round"
-        android:pathData="M38,46 L38,24"/>
+        <!-- Folder tab highlight -->
+        <path
+            android:fillColor="#16A34A"
+            android:pathData="M14,58 L94,58 L94,52 Q94,46 88,46 L48,46 Q45,46 43,48 L41,50 Q39,52 36,52 L20,52 Q14,52 14,58 Z"/>
 
-    <!-- UP arrow head (light mint) -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#86EFAC"
-        android:strokeWidth="7"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M28,35 L38,22 L48,35"/>
+        <!-- UP arrow shaft (light mint) -->
+        <path
+            android:fillColor="@android:color/transparent"
+            android:strokeColor="#86EFAC"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:pathData="M38,46 L38,24"/>
 
-    <!-- DOWN arrow shaft (dark purple) — x=70 -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#4C1D95"
-        android:strokeWidth="7"
-        android:strokeLineCap="round"
-        android:pathData="M70,22 L70,44"/>
+        <!-- UP arrow head -->
+        <path
+            android:fillColor="@android:color/transparent"
+            android:strokeColor="#86EFAC"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M28,35 L38,22 L48,35"/>
 
-    <!-- DOWN arrow head (dark purple) -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#4C1D95"
-        android:strokeWidth="7"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M60,33 L70,46 L80,33"/>
+        <!-- DOWN arrow shaft (dark purple) -->
+        <path
+            android:fillColor="@android:color/transparent"
+            android:strokeColor="#4C1D95"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:pathData="M70,22 L70,44"/>
+
+        <!-- DOWN arrow head -->
+        <path
+            android:fillColor="@android:color/transparent"
+            android:strokeColor="#4C1D95"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M60,33 L70,46 L80,33"/>
+
+    </group>
 
 </vector>
