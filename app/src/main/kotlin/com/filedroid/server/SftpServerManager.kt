@@ -48,10 +48,8 @@ class SftpServerManager @Inject constructor() {
             android.os.Environment.getExternalStorageDirectory().absolutePath
         }
         val rootNio = Paths.get(rootPath)
-        // Override getUserHomeDir to always return rootNio regardless of username,
-        // bypassing MINA's internal user-map lookup that throws "No user home"
         sshd.fileSystemFactory = object : VirtualFileSystemFactory(rootNio) {
-            override fun getUserHomeDir(session: org.apache.sshd.common.session.Session): java.nio.file.Path = rootNio
+            override fun getUserHomeDir(session: org.apache.sshd.common.session.SessionContext): java.nio.file.Path = rootNio
         }
 
         sshd.start()
