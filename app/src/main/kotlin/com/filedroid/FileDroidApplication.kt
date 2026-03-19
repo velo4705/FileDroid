@@ -9,9 +9,9 @@ import java.security.Security
 class FileDroidApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Register BC so SSHJ can use X25519 and other modern algorithms
-        if (Security.getProvider("BC") == null) {
-            Security.addProvider(BouncyCastleProvider())
-        }
+        // Register full BC so SSHJ can use X25519 and other modern algorithms.
+        // Android ships a stripped BC — insert ours at position 1 to take priority.
+        Security.removeProvider("BC")
+        Security.insertProviderAt(BouncyCastleProvider(), 1)
     }
 }
