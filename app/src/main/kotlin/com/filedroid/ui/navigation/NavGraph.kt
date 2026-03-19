@@ -3,6 +3,7 @@ package com.filedroid.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -104,7 +105,13 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
             TransferQueueScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(Routes.SERVER) {
-            ServerControlScreen(onNavigateBack = { navController.popBackStack() })
+            // Scope to the HOME back stack entry so state survives navigation away and back
+            val homeEntry = remember(it) { navController.getBackStackEntry(Routes.HOME) }
+            val serverViewModel: com.filedroid.ui.server.ServerViewModel = hiltViewModel(homeEntry)
+            ServerControlScreen(
+                onNavigateBack = { navController.popBackStack() },
+                viewModel = serverViewModel
+            )
         }
         composable(Routes.SSH_PROFILES) {
             SshProfileListScreen(

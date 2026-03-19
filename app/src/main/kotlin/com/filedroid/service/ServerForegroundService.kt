@@ -68,6 +68,19 @@ class ServerForegroundService : Service() {
             .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .build()
         connectivityManager?.registerNetworkCallback(req, networkCallback)
+
+        // Pre-generate the SFTP host key in the background so it's ready when start() is called.
+        // SimpleGeneratorHostKeyProvider blocks on first run (RSA 2048 key gen can take seconds).
+        serviceScope.launch {
+            runCatching {
+                val keyFile = File(filesDir, "host_key.ser")
+                org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider(keyFile.toPath())
+                    .apply {
+                        algorithm = org.apache.sshd.common.keyprovider.KeyPairProvider.SSH_RSA
+                        keySize = 2048
+                    }.loadKeys(null) // triggers generation/load
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

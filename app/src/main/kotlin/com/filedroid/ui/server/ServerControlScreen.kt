@@ -41,9 +41,19 @@ fun ServerControlScreen(
     ) { granted ->
         if (granted) {
             pendingStart?.let { (ftp, sftp) -> viewModel.startServers(ftp, sftp) }
+            pendingStart = null
+        } else {
+            // Denied — check if permanently blocked (can't show dialog again)
+            val activity = context as? android.app.Activity
+            val canAskAgain = activity != null && ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.POST_NOTIFICATIONS
+            )
+            if (!canAskAgain) {
+                // Permanently denied — guide to Settings
+                showSettingsDialog = true
+            }
+            pendingStart = null
         }
-        // if denied we already showed the rationale dialog below — server won't start without notif on 13+
-        pendingStart = null
     }
 
     // Shown when permission is permanently denied — user must go to Settings
@@ -69,24 +79,17 @@ fun ServerControlScreen(
 
     fun requestStartServers(ftp: Boolean, sftp: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val activity = context as? android.app.Activity
             val alreadyGranted = androidx.core.content.ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-            when {
-                alreadyGranted -> viewModel.startServers(ftp, sftp)
-                activity != null && ActivityCompat.shouldShowRequestPermissionRationale(
-                    activity, Manifest.permission.POST_NOTIFICATIONS
-                ) -> {
-                    // Can still ask — show the system dialog
-                    pendingStart = ftp to sftp
-                    notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-                else -> {
-                    // Permanently denied — send to Settings
-                    showSettingsDialog = true
-                }
+            if (alreadyGranted) {
+                viewModel.startServers(ftp, sftp)
+            } else {
+                // Always try the system dialog first.
+                // If permanently denied, the launcher result comes back false and we show Settings.
+                pendingStart = ftp to sftp
+                notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         } else {
             viewModel.startServers(ftp, sftp)
