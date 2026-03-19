@@ -21,6 +21,11 @@ import java.io.File
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class ServerForegroundService : Service() {
@@ -28,6 +33,7 @@ class ServerForegroundService : Service() {
     @Inject lateinit var ftpManager: FtpServerManager
     @Inject lateinit var sftpManager: SftpServerManager
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var activeConfig: ServerConfig? = null
     private var connectivityManager: ConnectivityManager? = null
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -76,26 +82,30 @@ class ServerForegroundService : Service() {
     }
 
     private fun startServers(config: ServerConfig) {
-        // Fall back to external storage root if no root path was configured
         val resolvedRoot = config.rootPath.ifBlank {
             android.os.Environment.getExternalStorageDirectory().absolutePath
         }
         val resolved = config.copy(rootPath = resolvedRoot)
         activeConfig = resolved
 
-        // Must call startForeground before any heavy work on Android 8+
+        // Must call startForeground on the main thread before doing any work
         startForeground(NOTIF_ID, buildNotification(resolved))
 
-        if (resolved.ftpEnabled) ftpManager.start(resolved).onFailure { stopSelf() }
-        if (resolved.sftpEnabled) {
-            val keyFile = File(filesDir, "host_key.ser")
-            sftpManager.start(resolved, keyFile).onFailure { stopSelf() }
+        // Server socket binding must happen off the main thread
+        serviceScope.launch {
+            if (resolved.ftpEnabled) ftpManager.start(resolved).onFailure { stopSelf() }
+            if (resolved.sftpEnabled) {
+                val keyFile = File(filesDir, "host_key.ser")
+                sftpManager.start(resolved, keyFile).onFailure { stopSelf() }
+            }
         }
     }
 
     private fun stopServers() {
-        ftpManager.stop()
-        sftpManager.stop()
+        serviceScope.launch {
+            ftpManager.stop()
+            sftpManager.stop()
+        }
         activeConfig = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -110,6 +120,7 @@ class ServerForegroundService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         runCatching { connectivityManager?.unregisterNetworkCallback(networkCallback) }
+        serviceScope.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
