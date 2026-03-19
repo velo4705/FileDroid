@@ -54,7 +54,8 @@ class SshSession(
         client.authPassword(username, password)
 
         val sess = client.startSession()
-        sess.allocateDefaultPTY()
+        // Explicit terminal size so shells (including Termux) send output immediately
+        sess.allocatePTY("xterm-256color", 220, 50, 0, 0, emptyMap())
         val sh = sess.startShell()
 
         ssh = client

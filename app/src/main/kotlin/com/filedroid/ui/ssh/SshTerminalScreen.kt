@@ -149,18 +149,31 @@ private fun TerminalPane(
             ) {
                 Text("Connection failed:\n${tab.error}", color = Color.Red, fontFamily = FontFamily.Monospace)
             }
-            else -> Text(
-                text = parseAnsi(tab.buffer),
-                fontFamily = FontFamily.Monospace,
-                fontSize = 13.sp,
-                color = Color.White,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(vScroll)
-                    .horizontalScroll(hScroll)
-                    .padding(8.dp)
-            )
+            else -> {
+                // Blinking cursor
+                var cursorVisible by remember { mutableStateOf(true) }
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        kotlinx.coroutines.delay(500)
+                        cursorVisible = !cursorVisible
+                    }
+                }
+                val displayText = remember(tab.buffer, cursorVisible) {
+                    parseAnsi(tab.buffer + if (cursorVisible) "█" else " ")
+                }
+                Text(
+                    text = displayText,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 13.sp,
+                    color = Color.White,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(vScroll)
+                        .horizontalScroll(hScroll)
+                        .padding(8.dp)
+                )
+            }
         }
 
         // Input row

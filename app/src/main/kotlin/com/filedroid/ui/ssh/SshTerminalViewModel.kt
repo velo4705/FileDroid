@@ -43,14 +43,19 @@ class SshTerminalViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val result = session.connect(host, port, username, password)
-            updateTab(session.id) { it.copy(connecting = false, error = result.exceptionOrNull()?.message) }
-
-            if (result.isSuccess) {
+            // Start collecting output before connecting so we don't miss early prompt output
+            val collectJob = launch {
                 session.output.collect { chunk ->
                     updateTab(session.id) { it.copy(buffer = it.buffer + chunk) }
                 }
             }
+
+            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                session.connect(host, port, username, password)
+            }
+            updateTab(session.id) { it.copy(connecting = false, error = result.exceptionOrNull()?.message) }
+
+            if (result.isFailure) collectJob.cancel()
         }
     }
 

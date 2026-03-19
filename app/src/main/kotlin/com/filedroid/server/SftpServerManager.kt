@@ -52,5 +52,5 @@ class SftpServerManager @Inject constructor() {
         server = null
     }
 
-    fun isRunning(): Boolean = server?.isStarted == true
+    fun isRunning(): Boolean = server != null && server!!.let { !it.isClosed && !it.isClosing }
 }
