@@ -3,6 +3,7 @@ package com.filedroid.ui.remote
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
+import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filedroid.data.ConnectionProfile
@@ -36,8 +37,8 @@ data class RemoteBrowserUiState(
     val showDeleteConfirm: Boolean = false,
     val selectedFile: RemoteFile? = null,
     val showReconnectPrompt: Boolean = false,
-    val downloadedToPath: String? = null,  // non-null briefly after a download completes
-    val uploadedFileName: String? = null   // non-null briefly after an upload is queued
+    val downloadedToPath: String? = null,
+    val uploadedFileName: String? = null
 )
 
 @HiltViewModel
@@ -53,7 +54,6 @@ class RemoteBrowserViewModel @Inject constructor(
     private var client: RemoteClient? = null
     private val backStack = ArrayDeque<String>()
 
-    /** Load profile by ID then connect. */
     fun loadAndConnect(profileId: Long) {
         viewModelScope.launch {
             val profile = profileRepo.getById(profileId) ?: return@launch
@@ -67,12 +67,11 @@ class RemoteBrowserViewModel @Inject constructor(
             _uiState.update { it.copy(isConnecting = true, error = null, profile = profile) }
             val remoteClient: RemoteClient = when (profile.protocol) {
                 Protocol.SFTP -> SftpClient()
-                Protocol.FTP -> FtpClient()
+                Protocol.FTP  -> FtpClient()
                 Protocol.FTPS -> FtpClient().also { it.useFtps() }
             }
             val result = when {
                 profile.anonymous -> remoteClient.connectAnonymous(profile.host, profile.port)
-                // R2.8 — private-key auth for SFTP
                 profile.usePrivateKey && remoteClient is SftpClient -> {
                     val privateKey = profileRepo.getPassword(profile) ?: ""
                     remoteClient.connectWithKey(profile.host, profile.port, profile.username, privateKey)
@@ -96,7 +95,6 @@ class RemoteBrowserViewModel @Inject constructor(
     }
 
     fun navigateTo(path: String) {
-        // R7.5 — reject path traversal
         if (path.contains("..")) {
             _uiState.update { it.copy(error = "Access denied: invalid path") }
             return
@@ -105,16 +103,13 @@ class RemoteBrowserViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             val result = client?.listDirectory(path)
             if (result == null) {
-                // client gone — prompt reconnect
                 _uiState.update { it.copy(isLoading = false, showReconnectPrompt = true) }
                 return@launch
             }
             result.fold(
                 onSuccess = { entries ->
                     backStack.addLast(path)
-                    _uiState.update {
-                        it.copy(currentPath = path, entries = entries, isLoading = false)
-                    }
+                    _uiState.update { it.copy(currentPath = path, entries = entries, isLoading = false) }
                 },
                 onFailure = { e ->
                     val msg = e.message ?: "Unknown error"
@@ -173,19 +168,22 @@ class RemoteBrowserViewModel @Inject constructor(
     fun download(file: RemoteFile) {
         val c = client ?: return
         val destDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val localPath = File(destDir, file.name).absolutePath
-        transferEngine.enqueueDownload(c, file.path, localPath, file.size)
-        _uiState.update { it.copy(downloadedToPath = localPath) }
+        if (file.isDirectory) {
+            // Recursive folder download
+            val localDir = File(destDir, file.name)
+            transferEngine.enqueueDirectoryDownload(c, file.path, localDir.absolutePath)
+        } else {
+            val localPath = File(destDir, file.name).absolutePath
+            transferEngine.enqueueDownload(c, file.path, localPath, file.size)
+        }
+        _uiState.update { it.copy(downloadedToPath = file.name) }
     }
 
-    /** Upload a file picked from the device to the current remote directory. */
-    fun upload(uri: Uri) {
+    /** Upload a single file picked from the device. */
+    fun uploadFile(uri: Uri) {
         val c = client ?: return
-        val fileName = uri.lastPathSegment?.substringAfterLast("/")
-            ?: uri.lastPathSegment
-            ?: "upload_${System.currentTimeMillis()}"
+        val fileName = resolveFileName(uri)
         val remotePath = _uiState.value.currentPath.trimEnd('/') + "/$fileName"
-        // Copy URI to a temp file so TransferEngine can read it as a File
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val tmp = File(context.cacheDir, fileName)
@@ -200,9 +198,63 @@ class RemoteBrowserViewModel @Inject constructor(
         }
     }
 
+    /** Upload a folder tree picked from the device (URI is a document tree). */
+    fun uploadFolder(uri: Uri) {
+        val c = client ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Materialise the tree into a temp directory
+                val tmpDir = File(context.cacheDir, "upload_${System.currentTimeMillis()}")
+                copyDocumentTree(uri, tmpDir)
+                val remotePath = _uiState.value.currentPath.trimEnd('/') + "/${tmpDir.name}"
+                transferEngine.enqueueDirectoryUpload(c, tmpDir.absolutePath, remotePath)
+                _uiState.update { it.copy(uploadedFileName = tmpDir.name + "/") }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Folder upload failed: ${e.message}") }
+            }
+        }
+    }
+
+    /** Resolve the human-readable display name from a content URI. */
+    private fun resolveFileName(uri: Uri): String {
+        // Try OpenableColumns first (works for most pickers)
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) return cursor.getString(idx)
+                }
+            }
+        // Fallback: last path segment of the URI
+        return uri.lastPathSegment?.substringAfterLast("/")
+            ?: "upload_${System.currentTimeMillis()}"
+    }
+
+    /** Recursively copy a document tree URI into a local directory. */
+    private fun copyDocumentTree(treeUri: Uri, destDir: File) {
+        destDir.mkdirs()
+        val docId = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri) ?: return
+        copyDocumentFile(docId, destDir)
+    }
+
+    private fun copyDocumentFile(
+        doc: androidx.documentfile.provider.DocumentFile,
+        destDir: File
+    ) {
+        if (doc.isDirectory) {
+            val subDir = File(destDir, doc.name ?: "folder")
+            subDir.mkdirs()
+            doc.listFiles().forEach { copyDocumentFile(it, subDir) }
+        } else {
+            val dest = File(destDir, doc.name ?: "file")
+            context.contentResolver.openInputStream(doc.uri)?.use { input ->
+                dest.outputStream().use { input.copyTo(it) }
+            }
+        }
+    }
+
     fun clearUploadedToast() = _uiState.update { it.copy(uploadedFileName = null) }
     fun clearDownloadedToast() = _uiState.update { it.copy(downloadedToPath = null) }
-
     fun dismissReconnectPrompt() = _uiState.update { it.copy(showReconnectPrompt = false) }
 
     fun reconnect() {

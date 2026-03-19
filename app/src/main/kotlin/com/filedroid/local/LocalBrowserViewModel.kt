@@ -23,7 +23,8 @@ data class LocalBrowserUiState(
     val showRenameDialog: Boolean = false,
     val showDeleteConfirm: Boolean = false,
     val selectedFile: LocalFile? = null,
-    val selectedPaths: Set<String> = emptySet()  // multi-select (R1.4)
+    val selectedPaths: Set<String> = emptySet(),
+    val searchQuery: String = ""
 )
 
 @HiltViewModel
@@ -130,6 +131,8 @@ class LocalBrowserViewModel @Inject constructor(
     }
 
     fun clearSelection() = _uiState.update { it.copy(selectedPaths = emptySet()) }
+
+    fun setSearchQuery(query: String) = _uiState.update { it.copy(searchQuery = query) }
 
     fun getSelectedFiles(): List<LocalFile> {
         val paths = _uiState.value.selectedPaths

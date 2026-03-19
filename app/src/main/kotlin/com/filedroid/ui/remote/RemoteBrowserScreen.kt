@@ -14,6 +14,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.filedroid.remote.RemoteFile
@@ -29,10 +31,22 @@ fun RemoteBrowserScreen(
     val profile = uiState.profile
     var newFolderName by remember { mutableStateOf("") }
     var showNewFolderDialog by remember { mutableStateOf(false) }
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+
+    val displayedEntries = remember(uiState.entries, searchQuery) {
+        if (searchQuery.isBlank()) uiState.entries
+        else uiState.entries.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? -> uri?.let { viewModel.upload(it) } }
+    ) { uri: Uri? -> uri?.let { viewModel.uploadFile(it) } }
+
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? -> uri?.let { viewModel.uploadFolder(it) } }
 
     // Connect on first composition
     LaunchedEffect(profileId) {
@@ -43,40 +57,76 @@ fun RemoteBrowserScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(profile?.label ?: "Remote Browser", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            uiState.currentPath,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            maxLines = 1
+            if (searchActive) {
+                TopAppBar(
+                    title = {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search files…") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                                focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                            )
                         )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (!viewModel.navigateUp()) {
-                            viewModel.disconnect()
-                            onNavigateBack()
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { searchActive = false; searchQuery = "" }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close search")
                         }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    },
+                    actions = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear")
+                            }
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { filePicker.launch("*/*") }) {
-                        Icon(Icons.Default.Upload, contentDescription = "Upload file")
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(profile?.label ?: "Remote Browser", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                uiState.currentPath,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                maxLines = 1
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            if (!viewModel.navigateUp()) {
+                                viewModel.disconnect()
+                                onNavigateBack()
+                            }
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { searchActive = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                        IconButton(onClick = { filePicker.launch("*/*") }) {
+                            Icon(Icons.Default.Upload, contentDescription = "Upload file")
+                        }
+                        IconButton(onClick = { folderPicker.launch(null) }) {
+                            Icon(Icons.Default.CreateNewFolder, contentDescription = "Upload folder")
+                        }
+                        IconButton(onClick = { showNewFolderDialog = true }) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = "New folder")
+                        }
+                        IconButton(onClick = { viewModel.navigateTo(uiState.currentPath) }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
                     }
-                    IconButton(onClick = { showNewFolderDialog = true }) {
-                        Icon(Icons.Default.CreateNewFolder, contentDescription = "New folder")
-                    }
-                    IconButton(onClick = { viewModel.navigateTo(uiState.currentPath) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                }
-            )
+                )
+            }
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -117,13 +167,21 @@ fun RemoteBrowserScreen(
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             // ".." parent directory entry
-                            if (uiState.currentPath.isNotBlank() && uiState.currentPath != "/") {
+                            if (uiState.currentPath.isNotBlank() && uiState.currentPath != "/" && !searchActive) {
                                 item {
                                     ParentDirRow(onClick = { viewModel.navigateUp() })
                                     HorizontalDivider()
                                 }
                             }
-                            items(uiState.entries, key = { it.path }) { file ->
+                            if (displayedEntries.isEmpty() && searchQuery.isNotBlank()) {
+                                item {
+                                    Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("No results for \"$searchQuery\"",
+                                            color = MaterialTheme.colorScheme.outline)
+                                    }
+                                }
+                            }
+                            items(displayedEntries, key = { it.path }) { file ->
                                 RemoteFileRow(
                                     file = file,
                                     onClick = {
@@ -170,6 +228,11 @@ fun RemoteBrowserScreen(
                 ) { Text("Uploading ${uiState.uploadedFileName}…") }
             }
         }
+    }
+
+    // Auto-focus search field when activated
+    LaunchedEffect(searchActive) {
+        if (searchActive) focusRequester.requestFocus()
     }
 
     // Reconnect prompt (R2.7)
@@ -273,10 +336,11 @@ private fun RemoteFileRow(
                 Icon(Icons.Default.MoreVert, contentDescription = "Options")
             }
             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                if (!file.isDirectory) {
-                    DropdownMenuItem(text = { Text("Download") }, onClick = { showMenu = false; onDownload() },
-                        leadingIcon = { Icon(Icons.Default.Download, null) })
-                }
+                DropdownMenuItem(
+                    text = { Text(if (file.isDirectory) "Download folder" else "Download") },
+                    onClick = { showMenu = false; onDownload() },
+                    leadingIcon = { Icon(Icons.Default.Download, null) }
+                )
                 DropdownMenuItem(text = { Text("Rename") }, onClick = { showMenu = false; onRename() },
                     leadingIcon = { Icon(Icons.Default.Edit, null) })
                 DropdownMenuItem(text = { Text("Delete") }, onClick = { showMenu = false; onDelete() },

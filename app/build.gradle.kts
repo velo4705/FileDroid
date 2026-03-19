@@ -115,6 +115,9 @@ dependencies {
     implementation(libs.mina.sshd.sftp)
     implementation(libs.ftpserver.core)
 
+    // Document file (folder picker support)
+    implementation(libs.documentfile)
+
     // Unit tests
     testImplementation(libs.kotest.runner)
     testImplementation(libs.kotest.property)

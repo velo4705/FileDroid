@@ -46,6 +46,83 @@ class TransferEngine @Inject constructor() {
         execute(job, client)
     }
 
+    /** Recursively download a remote directory to a local path. */
+    fun enqueueDirectoryDownload(client: RemoteClient, remotePath: String, localPath: String) {
+        val job = TransferJob(
+            direction = TransferDirection.DOWNLOAD,
+            fileName = remotePath.substringAfterLast("/") + "/",
+            localPath = localPath,
+            remotePath = remotePath,
+            totalBytes = 0L
+        )
+        addJob(job)
+        val coroutine = scope.launch {
+            updateJob(job.id) { it.copy(status = TransferStatus.IN_PROGRESS) }
+            val result = runCatching { downloadDirRecursive(client, remotePath, File(localPath)) }
+            result.fold(
+                onSuccess = { updateJob(job.id) { it.copy(status = TransferStatus.DONE) } },
+                onFailure = { e ->
+                    if (e is CancellationException) updateJob(job.id) { it.copy(status = TransferStatus.CANCELLED) }
+                    else updateJob(job.id) { it.copy(status = TransferStatus.FAILED, errorMessage = e.message) }
+                }
+            )
+        }
+        activeJobs[job.id] = coroutine
+    }
+
+    /** Recursively upload a local directory to a remote path. */
+    fun enqueueDirectoryUpload(client: RemoteClient, localPath: String, remotePath: String) {
+        val dir = File(localPath)
+        val job = TransferJob(
+            direction = TransferDirection.UPLOAD,
+            fileName = dir.name + "/",
+            localPath = localPath,
+            remotePath = remotePath,
+            totalBytes = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+        )
+        addJob(job)
+        val coroutine = scope.launch {
+            updateJob(job.id) { it.copy(status = TransferStatus.IN_PROGRESS) }
+            val result = runCatching { uploadDirRecursive(client, dir, remotePath) }
+            result.fold(
+                onSuccess = { updateJob(job.id) { it.copy(status = TransferStatus.DONE) } },
+                onFailure = { e ->
+                    if (e is CancellationException) updateJob(job.id) { it.copy(status = TransferStatus.CANCELLED) }
+                    else updateJob(job.id) { it.copy(status = TransferStatus.FAILED, errorMessage = e.message) }
+                }
+            )
+        }
+        activeJobs[job.id] = coroutine
+    }
+
+    private suspend fun downloadDirRecursive(client: RemoteClient, remotePath: String, localDir: File) {
+        localDir.mkdirs()
+        val entries = client.listDirectory(remotePath).getOrThrow()
+        for (entry in entries) {
+            val childLocal = File(localDir, entry.name)
+            if (entry.isDirectory) {
+                downloadDirRecursive(client, entry.path, childLocal)
+            } else {
+                childLocal.parentFile?.mkdirs()
+                val out = childLocal.outputStream()
+                client.download(entry.path, out).also { out.close() }.getOrThrow()
+            }
+        }
+    }
+
+    private suspend fun uploadDirRecursive(client: RemoteClient, localDir: File, remotePath: String) {
+        client.createDirectory(remotePath) // ignore error if already exists
+        for (child in (localDir.listFiles() ?: emptyArray())) {
+            val childRemote = "$remotePath/${child.name}"
+            if (child.isDirectory) {
+                uploadDirRecursive(client, child, childRemote)
+            } else {
+                val input = child.inputStream()
+                client.upload(input, childRemote).also { input.close() }.getOrThrow()
+            }
+        }
+    }
+
     fun cancel(jobId: String) {
         activeJobs[jobId]?.cancel()
         updateJob(jobId) { it.copy(status = TransferStatus.CANCELLED) }
