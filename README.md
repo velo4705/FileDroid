@@ -1,50 +1,55 @@
 # FileDroid
 
-A dual-panel file manager for Android, built for FTP, SFTP, and FTPS — like FileZilla, but on your phone.
+A dual-panel file manager for Android with built-in FTP, SFTP, and FTPS support — like FileZilla, but on your phone.
 
-## What it does
+[![Build](https://github.com/velo4705/FileDroid/actions/workflows/build.yml/badge.svg)](https://github.com/velo4705/FileDroid/actions/workflows/build.yml)
 
-- **Local panel** — browse and manage files on your Android device, including Termux storage
-- **Remote panel** — connect to any FTP/SFTP/FTPS server and browse its files
-- **Transfer** — upload and download files between your device and a remote server
-- **Server mode** — run an FTP/SFTP server on your phone so FileZilla and other clients can connect in
-- **SSH Manager** — open terminal sessions to remote hosts (PCs, servers, other phones)
+## Features
 
-## Tech Stack
+- **Local browser** — browse, copy, move, rename, and delete files on your device, including Termux storage
+- **Remote browser** — connect to any FTP, FTPS, or SFTP server and manage its files
+- **Private key auth** — authenticate to SFTP servers using PEM or OpenSSH private keys
+- **Transfer queue** — upload and download files with live progress, pause, and cancel
+- **Server mode** — run an FTP or SFTP server on your phone so desktop clients (FileZilla, WinSCP, etc.) can connect in
+- **Interface binding** — choose which network interface the server listens on
+- **SSH terminal** — open interactive terminal sessions to remote hosts with multi-tab support and ANSI color rendering
+- **Secure storage** — credentials stored in EncryptedSharedPreferences backed by Android Keystore
 
-- Kotlin + Jetpack Compose
-- Hilt (dependency injection)
-- Apache MINA SSHD (SFTP server + SSH client)
-- Apache FTP Server (FTP server)
-- Room (connection profile storage)
-- EncryptedSharedPreferences + Android Keystore (credential storage)
+## Requirements
 
-## Building
+- Android 8.0 (API 26) or higher
+- Wi-Fi or local network connection for server and client features
 
-This project builds via GitHub Actions. Every push to `main` produces a debug APK.
+## Installation
 
-1. Push to `main`
-2. Go to [Actions](../../actions) → latest run → download `filedroid-debug` artifact
+Builds are produced automatically by GitHub Actions on every push to `main`.
+
+1. Go to [Actions](../../actions) → latest passing run
+2. Download the `filedroid-debug` artifact
 3. Sideload to your device:
    ```bash
    adb install -r app-debug.apk
    ```
 
-## Milestones
+## Tech Stack
 
-| # | Scope | Status |
-|---|---|---|
-| M1 | Project foundation — scaf
-folding, DI, nav, CI | ✅ Done |
-| M2 | Local file browser, file ops, Termux bookmark | Up next |
-| M3 | FTP/SFTP client, connection profiles, remote browser | |
-| M4 | File transfer engine, progress, queue, cancel | |
-| M5 | FTP/SFTP server (inbound), background service | |
-| M6 | SSH Manager, terminal UI | |
-| M7 | Polish, FTPS, release signing, QA | |
+| Layer | Library |
+|---|---|
+| UI | Jetpack Compose + Material 3 |
+| DI | Hilt |
+| Navigation | Navigation Compose |
+| Database | Room |
+| Credentials | EncryptedSharedPreferences + Android Keystore |
+| FTP/FTPS client | Apache Commons Net |
+| SFTP client | SSHJ |
+| FTP server | Apache FTP Server |
+| SFTP server | Apache MINA SSHD |
 
-## Minimum Requirements
+## Default Ports
 
-- Android 8.0 (API 26) or higher
-- Wi-Fi or Ethernet connection for server/client features
- 
+| Protocol | Default port |
+|---|---|
+| FTP | 2121 |
+| SFTP | 2222 |
+
+Ports can be changed in Settings.
