@@ -58,8 +58,9 @@ class SftpServerManager @Inject constructor() {
 
         // Implement FileSystemFactory directly — returns the native FS, bypassing
         // VirtualFileSystemFactory and its getUserHomeDir/ValidateUtils chain entirely.
-        sshd.fileSystemFactory = FileSystemFactory { _: SessionContext ->
-            FileSystems.getDefault()
+        sshd.fileSystemFactory = object : FileSystemFactory {
+            override fun getUserHomeDir(session: SessionContext) = Paths.get(rootPath)
+            override fun createFileSystem(session: SessionContext) = FileSystems.getDefault()
         }
         sshd.subsystemFactories = listOf(SftpSubsystemFactory())
 
