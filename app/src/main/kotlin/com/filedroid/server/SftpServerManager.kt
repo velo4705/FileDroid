@@ -1,7 +1,6 @@
 package com.filedroid.server
 
 import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
-import org.apache.sshd.common.file.root.RootedFileSystemProvider
 import org.apache.sshd.common.keyprovider.KeyPairProvider
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
@@ -29,7 +28,14 @@ class SftpServerManager @Inject constructor() {
         // Ensure key file directory exists
         hostKeyFile.parentFile?.mkdirs()
 
-        val sshd = SshServer.setUpDefaultServer()
+        // Android's ServiceLoader needs the app classloader — MINA uses it to find its factories
+        val prevCl = Thread.currentThread().contextClassLoader
+        Thread.currentThread().contextClassLoader = SshServer::class.java.classLoader
+        val sshd = try {
+            SshServer.setUpDefaultServer()
+        } finally {
+            Thread.currentThread().contextClassLoader = prevCl
+        }
         sshd.port = config.sftpPort
         sshd.host = if (config.bindAddress.isNotBlank()) config.bindAddress else "0.0.0.0"
 
@@ -43,30 +49,36 @@ class SftpServerManager @Inject constructor() {
             username == config.username && password == config.password
         }
 
-        sshd.subsystemFactories = listOf(SftpSubsystemFactory())
-
         val rootPath = config.rootPath.ifBlank {
             android.os.Environment.getExternalStorageDirectory().absolutePath
         }
         val rootNio = Paths.get(rootPath)
-        sshd.fileSystemFactory = object : VirtualFileSystemFactory(rootNio) {
-            override fun getUserHomeDir(session: org.apache.sshd.common.session.SessionContext): java.nio.file.Path = rootNio
-            override fun createFileSystem(session: org.apache.sshd.common.session.SessionContext): java.nio.file.FileSystem {
-                return org.apache.sshd.common.file.root.RootedFileSystemProvider()
-                    .newFileSystem(rootNio, emptyMap<String, Any>())
-            }
+
+        // VirtualFileSystemFactory with both defaultHomeDir AND per-user entry set,
+        // so getUserHomeDir(session) can never return null for our user.
+        val fsFactory = org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory().apply {
+            defaultHomeDir = rootNio
+            setUserHomeDir(config.username, rootNio)
         }
+        sshd.fileSystemFactory = fsFactory
+        sshd.subsystemFactories = listOf(SftpSubsystemFactory())
 
         sshd.start()
 
-        // sshd.start() is non-blocking — poll until the port is actually bound (up to 10s)
+        // Poll until port is bound on loopback (up to 10s)
         val deadline = System.currentTimeMillis() + 10_000
         var bound = false
         while (System.currentTimeMillis() < deadline) {
-            if (isPortBound(config.sftpPort)) { bound = true; break }
+            if (isPortBound("127.0.0.1", config.sftpPort)) { bound = true; break }
             Thread.sleep(200)
         }
         if (!bound) throw IllegalStateException("SFTP server did not bind to port ${config.sftpPort} within 10s")
+
+        // Also verify it's reachable on the WiFi interface
+        val wifiIp = getWifiIp()
+        if (wifiIp != null && !isPortBound(wifiIp, config.sftpPort)) {
+            android.util.Log.w("SftpServerManager", "Port ${config.sftpPort} not reachable on $wifiIp — may be blocked by Android firewall")
+        }
 
         server = sshd
         running = true
@@ -80,14 +92,21 @@ class SftpServerManager @Inject constructor() {
 
     fun isRunning(): Boolean = running && server != null && !server!!.isClosed
 
-    private fun isPortBound(port: Int): Boolean = try {
-        // Probe on loopback — avoids Android restrictions on binding to 0.0.0.0 in a test socket
+    private fun isPortBound(host: String, port: Int): Boolean = try {
         ServerSocket().use { s ->
             s.reuseAddress = true
-            s.bind(InetSocketAddress("127.0.0.1", port))
-            false // successfully bound = port was free = server not listening yet
+            s.bind(InetSocketAddress(host, port))
+            false // bound = port was free = server not listening
         }
     } catch (_: Exception) {
-        true // failed to bind = port already in use = server is listening
+        true // failed to bind = port in use = server is listening
     }
+
+    private fun getWifiIp(): String? = runCatching {
+        java.net.NetworkInterface.getNetworkInterfaces()?.toList()
+            ?.filter { it.isUp && !it.isLoopback }
+            ?.flatMap { it.inetAddresses.toList() }
+            ?.firstOrNull { it is java.net.Inet4Address }
+            ?.hostAddress
+    }.getOrNull()
 }
