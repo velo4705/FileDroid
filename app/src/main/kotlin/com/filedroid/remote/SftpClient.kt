@@ -67,6 +67,11 @@ class SftpClient @Inject constructor() : RemoteClient {
     override suspend fun connectAnonymous(host: String, port: Int): Result<Unit> =
         Result.failure(UnsupportedOperationException("SFTP does not support anonymous connections"))
 
+    /** Resolve the real home directory path on the server. */
+    suspend fun resolveHomePath(): String = withContext(Dispatchers.IO) {
+        runCatching { sftp!!.canonicalize(".") }.getOrDefault("/")
+    }
+
     override suspend fun listDirectory(path: String): Result<List<RemoteFile>> =
         withContext(Dispatchers.IO) {
             runCatching {

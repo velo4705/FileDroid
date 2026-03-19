@@ -82,6 +82,173 @@ Ports can be changed in **Settings → Server Ports**.
 
 ---
 
+## Connecting to a remote machine from FileDroid
+
+To connect to a machine, you need its **IP address**, **port**, **username**, and **password** (or private key for SFTP). Here's how to find them on each platform.
+
+---
+
+### Windows
+
+**Find the IP address**
+1. Open Command Prompt (`Win + R` → type `cmd`)
+2. Run:
+   ```
+   ipconfig
+   ```
+3. Look for `IPv4 Address` under your active network adapter (e.g. `192.168.1.10`)
+
+**Find the username**
+```
+echo %USERNAME%
+```
+
+**Set up an FTP/SFTP server to connect to**
+- Windows has no built-in FTP/SFTP server. Install one:
+  - **FileZilla Server** (FTP/FTPS) — free, easy to set up
+  - **OpenSSH** (SFTP) — built into Windows 10/11:
+    1. `Settings → Apps → Optional Features → Add a feature → OpenSSH Server`
+    2. Start it: `Services → OpenSSH SSH Server → Start`
+    3. Default SFTP port: `22`, username = your Windows username, password = your Windows password
+
+---
+
+### macOS
+
+**Find the IP address**
+1. `System Settings → Wi-Fi → Details` next to your network
+2. Or in Terminal:
+   ```bash
+   ipconfig getifaddr en0
+   ```
+
+**Find the username**
+```bash
+whoami
+```
+
+**Enable SFTP (SSH)**
+1. `System Settings → General → Sharing → Remote Login → On`
+2. Default port: `22`, username = your macOS username, password = your macOS login password
+
+---
+
+### Linux
+
+**Find the IP address**
+```bash
+ip a
+# or
+hostname -I
+```
+
+**Find the username**
+```bash
+whoami
+```
+
+**Enable SFTP (SSH)**
+
+OpenSSH is the standard SSH/SFTP server on all distros. Install and start it:
+
+Debian / Ubuntu / Linux Mint / Pop!_OS:
+```bash
+sudo apt install openssh-server
+sudo systemctl enable --now ssh
+```
+
+Fedora / RHEL / CentOS / Rocky Linux:
+```bash
+sudo dnf install openssh-server
+sudo systemctl enable --now sshd
+```
+
+Arch Linux / Manjaro / EndeavourOS:
+```bash
+sudo pacman -S openssh
+sudo systemctl enable --now sshd
+```
+
+openSUSE:
+```bash
+sudo zypper install openssh
+sudo systemctl enable --now sshd
+```
+
+Alpine Linux:
+```bash
+apk add openssh
+rc-update add sshd
+service sshd start
+```
+
+Default port: `22`, username = your Linux username, password = your login password.
+
+> If you have a firewall enabled, allow SSH through:
+> ```bash
+> # ufw (Ubuntu/Debian)
+> sudo ufw allow ssh
+> # firewalld (Fedora/RHEL)
+> sudo firewall-cmd --permanent --add-service=ssh && sudo firewall-cmd --reload
+> ```
+
+**Enable FTP (vsftpd)**
+
+Debian / Ubuntu:
+```bash
+sudo apt install vsftpd
+sudo systemctl enable --now vsftpd
+```
+
+Fedora / RHEL:
+```bash
+sudo dnf install vsftpd
+sudo systemctl enable --now vsftpd
+```
+
+Arch Linux:
+```bash
+sudo pacman -S vsftpd
+sudo systemctl enable --now vsftpd
+```
+
+---
+
+### Termux (Android)
+
+**Find the IP address**
+```bash
+ip route get 1 | awk '{print $7}'
+# or just check Settings → Wi-Fi on your device
+```
+
+**Find the username**
+```bash
+whoami
+# usually returns: u0_a<number>
+```
+
+**Start an SFTP server in Termux**
+```bash
+pkg install openssh
+sshd
+```
+- Default port: `8022`
+- Password: set one with `passwd` before connecting
+- Connect from FileDroid using your device's IP, port `8022`, username from `whoami`, and the password you set
+
+---
+
+### In FileDroid
+
+Once you have the details, tap **+** on the Home screen:
+- **Host** — the IP address from above
+- **Port** — `22` for SSH/SFTP, `21` for FTP, `8022` for Termux
+- **Username** — from `whoami` or your system username
+- **Password** — your login password, or leave blank if using a private key
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

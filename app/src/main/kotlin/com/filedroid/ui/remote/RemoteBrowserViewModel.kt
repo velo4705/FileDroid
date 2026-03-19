@@ -99,7 +99,15 @@ class RemoteBrowserViewModel @Inject constructor(
                 onSuccess = {
                     client = remoteClient
                     _uiState.update { it.copy(isConnected = true, isConnecting = false) }
-                    navigateTo(profile.initialRemotePath)
+                    // Resolve "~" to the actual home directory on the server
+                    val initialPath = when {
+                        profile.initialRemotePath == "~" && remoteClient is SftpClient ->
+                            remoteClient.resolveHomePath()
+                        profile.initialRemotePath == "~" ->
+                            "/" // FTP has no home dir concept, fall back to root
+                        else -> profile.initialRemotePath
+                    }
+                    navigateTo(initialPath)
                 },
                 onFailure = { e ->
                     _uiState.update { it.copy(isConnecting = false, error = e.message) }
