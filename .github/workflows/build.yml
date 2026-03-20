@@ -85,6 +85,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "ref is ${{ github.ref }}"
+          echo "ref_name is ${{ github.ref_name }}"
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
             cp app/build/outputs/apk/release/app-release.apk filedroid-${{ github.ref_name }}.apk
           else
