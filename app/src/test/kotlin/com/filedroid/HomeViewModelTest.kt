@@ -2,60 +2,69 @@ package com.filedroid
 
 import android.content.Context
 import com.filedroid.permission.PermissionManager
-import com.filedroid.security.CredentialKeys
 import com.filedroid.security.CredentialStore
 import com.filedroid.ui.home.HomeViewModel
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 
-class HomeViewModelTest : FunSpec({
+@OptIn(ExperimentalCoroutinesApi::class)
+class HomeViewModelTest : FunSpec() {
 
-    fun buildViewModel(
-        hasPassword: Boolean,
-        hasPermission: Boolean
-    ): HomeViewModel {
-        val store = mockk<CredentialStore>()
-        every { store.hasServerPassword() } returns hasPassword
+    private val testDispatcher = StandardTestDispatcher()
 
-        val permManager = mockk<PermissionManager>()
-        val context = mockk<Context>(relaxed = true)
-        every { permManager.isStoragePermissionGranted(context) } returns hasPermission
+    init {
+        beforeSpec { Dispatchers.setMain(testDispatcher) }
+        afterSpec { Dispatchers.resetMain() }
 
-        val cm = mockk<android.net.ConnectivityManager>(relaxed = true)
-        every { context.getSystemService(android.net.ConnectivityManager::class.java) } returns cm
+        fun buildViewModel(hasPassword: Boolean, hasPermission: Boolean): HomeViewModel {
+            val store = mockk<CredentialStore>()
+            every { store.hasServerPassword() } returns hasPassword
 
-        return HomeViewModel(store, permManager, context)
+            val permManager = mockk<PermissionManager>()
+            val context = mockk<Context>(relaxed = true)
+            every { permManager.isStoragePermissionGranted(context) } returns hasPermission
+
+            val cm = mockk<android.net.ConnectivityManager>(relaxed = true)
+            every { context.getSystemService(android.net.ConnectivityManager::class.java) } returns cm
+
+            return HomeViewModel(store, permManager, context)
+        }
+
+        test("canStartServer is false when hasServerPassword is false") {
+            val vm = buildViewModel(hasPassword = false, hasPermission = true)
+            vm.uiState.value.canStartServer shouldBe false
+        }
+
+        test("canStartServer is false when storagePermissionGranted is false") {
+            val vm = buildViewModel(hasPassword = true, hasPermission = false)
+            vm.uiState.value.canStartServer shouldBe false
+        }
+
+        test("canStartServer is false when both are false") {
+            val vm = buildViewModel(hasPassword = false, hasPermission = false)
+            vm.uiState.value.canStartServer shouldBe false
+        }
+
+        test("canStartServer is true when both are true") {
+            val vm = buildViewModel(hasPassword = true, hasPermission = true)
+            vm.uiState.value.canStartServer shouldBe true
+        }
+
+        test("hasServerPassword reflects credential store state") {
+            val vm = buildViewModel(hasPassword = false, hasPermission = false)
+            vm.uiState.value.hasServerPassword shouldBe false
+        }
+
+        test("storagePermissionGranted reflects permission manager state") {
+            val vm = buildViewModel(hasPassword = true, hasPermission = false)
+            vm.uiState.value.storagePermissionGranted shouldBe false
+        }
     }
-
-    test("canStartServer is false when hasServerPassword is false") {
-        val vm = buildViewModel(hasPassword = false, hasPermission = true)
-        vm.uiState.value.canStartServer shouldBe false
-    }
-
-    test("canStartServer is false when storagePermissionGranted is false") {
-        val vm = buildViewModel(hasPassword = true, hasPermission = false)
-        vm.uiState.value.canStartServer shouldBe false
-    }
-
-    test("canStartServer is false when both hasServerPassword and storagePermissionGranted are false") {
-        val vm = buildViewModel(hasPassword = false, hasPermission = false)
-        vm.uiState.value.canStartServer shouldBe false
-    }
-
-    test("canStartServer is true when both hasServerPassword and storagePermissionGranted are true") {
-        val vm = buildViewModel(hasPassword = true, hasPermission = true)
-        vm.uiState.value.canStartServer shouldBe true
-    }
-
-    test("hasServerPassword reflects credential store state") {
-        val vm = buildViewModel(hasPassword = false, hasPermission = false)
-        vm.uiState.value.hasServerPassword shouldBe false
-    }
-
-    test("storagePermissionGranted reflects permission manager state") {
-        val vm = buildViewModel(hasPassword = true, hasPermission = false)
-        vm.uiState.value.storagePermissionGranted shouldBe false
-    }
-})
+}

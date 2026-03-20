@@ -50,10 +50,12 @@ class HomeViewModel @Inject constructor(
 
     init {
         refresh()
-        connectivityManager.registerNetworkCallback(
-            NetworkRequest.Builder().build(),
-            networkCallback
-        )
+        runCatching {
+            connectivityManager.registerNetworkCallback(
+                NetworkRequest.Builder().build(),
+                networkCallback
+            )
+        }
     }
 
     override fun onCleared() {
