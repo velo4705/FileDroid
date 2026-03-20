@@ -159,6 +159,25 @@ fun SettingsScreen(
                     ) { Text("Save Ports") }
                 }
             }
+
+            // ── Credits ──────────────────────────────────────────────────
+            Spacer(Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    "FileDroid — Free & Open Source",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Text(
+                    "GPL-3.0 · github.com/imloafy/FileDroid",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
         }
     }
 }

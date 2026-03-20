@@ -111,39 +111,36 @@ class SshSession(val id: String, val label: String) {
     }
 
     /**
-     * Removes the echoed command from [chunk]. Strips ANSI, finds the command text,
-     * then removes it from the raw chunk by scanning character by character.
+     * Removes the echoed command from [chunk] once, then clears lastSent so it can't
+     * match again. Walks raw+stripped in parallel to handle ANSI codes mid-echo.
      */
     private fun filterEcho(chunk: String): String {
         val cmd = lastSent
         if (cmd.isEmpty()) return chunk
 
-        // Work on the ANSI-stripped version to find the command
         val stripped = stripAnsi(chunk)
-        if (!stripped.contains(cmd)) return chunk
+        val cmdStart = stripped.indexOf(cmd)
+        if (cmdStart == -1) return chunk
 
-        // Rebuild the raw chunk skipping the characters that correspond to cmd in stripped
+        // Found it — clear so we don't filter the same command again
+        lastSent = ""
+
+        val cmdEnd = cmdStart + cmd.length
         val ansiPattern = Regex("\u001B(?:\\[[?!]?[0-9;]*[A-Za-z]|\\][^\u0007\u001B]*(?:\u0007|\u001B\\\\)|[^\\[\\]])")
         val result = StringBuilder()
         var strippedIdx = 0
         var pos = 0
-        // Find start of cmd in stripped
-        val cmdStart = stripped.indexOf(cmd)
-        val cmdEnd = cmdStart + cmd.length
 
         while (pos < chunk.length) {
             val escMatch = ansiPattern.find(chunk, pos)
             if (escMatch != null && escMatch.range.first == pos) {
-                // It's an escape sequence — keep it unless we're inside the cmd span
-                if (strippedIdx < cmdStart || strippedIdx >= cmdEnd) {
-                    result.append(escMatch.value)
-                }
+                // Escape sequence — keep unless the next visible char is inside the cmd span
+                // (i.e. the escape is styling the cmd text itself)
+                val nextVisibleInCmd = strippedIdx in cmdStart until cmdEnd
+                if (!nextVisibleInCmd) result.append(escMatch.value)
                 pos = escMatch.range.last + 1
             } else {
-                // Visible character
-                if (strippedIdx < cmdStart || strippedIdx >= cmdEnd) {
-                    result.append(chunk[pos])
-                }
+                if (strippedIdx !in cmdStart until cmdEnd) result.append(chunk[pos])
                 strippedIdx++
                 pos++
             }
