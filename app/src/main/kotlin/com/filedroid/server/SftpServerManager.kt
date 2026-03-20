@@ -1,18 +1,16 @@
 package com.filedroid.server
 
 import org.apache.sshd.common.file.FileSystemFactory
-import org.apache.sshd.common.keyprovider.KeyPairProvider
+import org.apache.sshd.common.keyprovider.MappedKeyPairProvider
 import org.apache.sshd.common.session.SessionContext
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
-import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
-import java.io.File
 import java.net.InetSocketAddress
-import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.nio.file.FileSystems
 import java.nio.file.Paths
+import java.security.KeyPairGenerator
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,14 +20,11 @@ class SftpServerManager @Inject constructor() {
     private var server: SshServer? = null
     private var running = false
 
-    fun start(config: ServerConfig, hostKeyFile: File): Result<Unit> = runCatching {
+    fun start(config: ServerConfig): Result<Unit> = runCatching {
         // Stop any existing instance first
         runCatching { server?.stop(true) }
         server = null
         running = false
-
-        // Ensure key file directory exists
-        hostKeyFile.parentFile?.mkdirs()
 
         val rootPath = config.rootPath.ifBlank {
             android.os.Environment.getExternalStorageDirectory().absolutePath
@@ -49,11 +44,10 @@ class SftpServerManager @Inject constructor() {
         sshd.port = config.sftpPort
         sshd.host = if (config.bindAddress.isNotBlank()) config.bindAddress else "0.0.0.0"
 
-        val keyProvider = SimpleGeneratorHostKeyProvider(hostKeyFile.toPath()).apply {
-            algorithm = KeyPairProvider.SSH_RSA
-            keySize = 2048
-        }
-        sshd.keyPairProvider = keyProvider
+        // Generate RSA host key in-memory — SimpleGeneratorHostKeyProvider uses Java
+        // serialization which is unreliable on Android and causes "no resolved signatures"
+        val keyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+        sshd.keyPairProvider = MappedKeyPairProvider(keyPair)
 
         sshd.passwordAuthenticator = PasswordAuthenticator { username, password, _ ->
             username == config.username && password == config.password

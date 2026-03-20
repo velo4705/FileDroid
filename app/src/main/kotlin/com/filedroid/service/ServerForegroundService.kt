@@ -69,17 +69,9 @@ class ServerForegroundService : Service() {
             .build()
         connectivityManager?.registerNetworkCallback(req, networkCallback)
 
-        // Pre-generate the SFTP host key in the background so it's ready when start() is called.
-        // SimpleGeneratorHostKeyProvider blocks on first run (RSA 2048 key gen can take seconds).
+        // Pre-warm RSA key generation so the first SFTP start is fast
         serviceScope.launch {
-            runCatching {
-                val keyFile = File(filesDir, "host_key.ser")
-                org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider(keyFile.toPath())
-                    .apply {
-                        algorithm = org.apache.sshd.common.keyprovider.KeyPairProvider.SSH_RSA
-                        keySize = 2048
-                    }.loadKeys(null) // triggers generation/load
-            }
+            runCatching { java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair() }
         }
     }
 
@@ -111,8 +103,7 @@ class ServerForegroundService : Service() {
                 if (!resolved.sftpEnabled) stopSelf()
             }
             if (resolved.sftpEnabled) {
-                val keyFile = File(filesDir, "host_key.ser")
-                sftpManager.start(resolved, keyFile).onFailure {
+                sftpManager.start(resolved).onFailure {
                     val msg = it.message ?: it.cause?.message ?: it::class.simpleName ?: "unknown error"
                     updateNotificationError("SFTP failed: $msg")
                     if (!resolved.ftpEnabled || !ftpManager.isRunning()) stopSelf()
