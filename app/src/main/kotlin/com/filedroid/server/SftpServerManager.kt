@@ -31,6 +31,13 @@ class SftpServerManager @Inject constructor() {
         // Ensure key file directory exists
         hostKeyFile.parentFile?.mkdirs()
 
+        val rootPath = config.rootPath.ifBlank {
+            android.os.Environment.getExternalStorageDirectory().absolutePath
+        }
+
+        // MINA reads user.home as a fallback in multiple places — set it before server init
+        System.setProperty("user.home", rootPath)
+
         // Android's ServiceLoader needs the app classloader — MINA uses it to find its factories
         val prevCl = Thread.currentThread().contextClassLoader
         Thread.currentThread().contextClassLoader = SshServer::class.java.classLoader
@@ -50,10 +57,6 @@ class SftpServerManager @Inject constructor() {
 
         sshd.passwordAuthenticator = PasswordAuthenticator { username, password, _ ->
             username == config.username && password == config.password
-        }
-
-        val rootPath = config.rootPath.ifBlank {
-            android.os.Environment.getExternalStorageDirectory().absolutePath
         }
 
         // Implement FileSystemFactory directly — returns the native FS, bypassing
