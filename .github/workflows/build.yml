@@ -44,7 +44,7 @@ jobs:
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: echo "$KEYSTORE_BASE64" | base64 --decode > release.keystore
+        run: echo "$KEYSTORE_BASE64" | tr -d '\n' | base64 -d > release.keystore
 
       - name: Run unit tests
         run: ./gradlew test --no-daemon
