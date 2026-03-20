@@ -3,6 +3,7 @@ name: Build FileDroid APK
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
@@ -76,3 +77,15 @@ jobs:
           name: filedroid-release
           path: app/build/outputs/apk/release/app-release.apk
           retention-days: 14
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') && env.KEYSTORE_BASE64 != ''
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk filedroid-${{ github.ref_name }}.apk
+          gh release create ${{ github.ref_name }} \
+            filedroid-${{ github.ref_name }}.apk \
+            --title "FileDroid ${{ github.ref_name }}" \
+            --generate-notes
