@@ -20,8 +20,11 @@ class HomeViewModelTest : FunSpec({
         every { store.hasServerPassword() } returns hasPassword
 
         val permManager = mockk<PermissionManager>()
-        val context = mockk<Context>()
+        val context = mockk<Context>(relaxed = true)
         every { permManager.isStoragePermissionGranted(context) } returns hasPermission
+
+        val cm = mockk<android.net.ConnectivityManager>(relaxed = true)
+        every { context.getSystemService(android.net.ConnectivityManager::class.java) } returns cm
 
         return HomeViewModel(store, permManager, context)
     }
