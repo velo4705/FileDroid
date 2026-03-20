@@ -111,48 +111,44 @@ class SshSession(val id: String, val label: String) {
     }
 
     /**
-     * Removes the echoed command from [chunk]. The shell sends back exactly what we typed
-     * (possibly with ANSI codes interspersed) somewhere in the chunk — strip it out by
-     * doing a substring match on the ANSI-stripped version, then remove the corresponding
-     * span from the raw chunk.
+     * Removes the echoed command from [chunk]. Strips ANSI, finds the command text,
+     * then removes it from the raw chunk by scanning character by character.
      */
     private fun filterEcho(chunk: String): String {
         val cmd = lastSent
         if (cmd.isEmpty()) return chunk
 
+        // Work on the ANSI-stripped version to find the command
         val stripped = stripAnsi(chunk)
+        if (!stripped.contains(cmd)) return chunk
 
-        // Find where the command text appears in the stripped version
-        val idx = stripped.indexOf(cmd)
-        if (idx == -1) return chunk
-
-        // Map the index back to the raw chunk by walking both strings in parallel
-        var rawIdx = 0
-        var strippedPos = 0
+        // Rebuild the raw chunk skipping the characters that correspond to cmd in stripped
         val ansiPattern = Regex("\u001B(?:\\[[?!]?[0-9;]*[A-Za-z]|\\][^\u0007\u001B]*(?:\u0007|\u001B\\\\)|[^\\[\\]])")
-
-        // Build a list of (rawStart, rawEnd) for each visible character in chunk
-        val rawPositions = mutableListOf<Int>()
+        val result = StringBuilder()
+        var strippedIdx = 0
         var pos = 0
+        // Find start of cmd in stripped
+        val cmdStart = stripped.indexOf(cmd)
+        val cmdEnd = cmdStart + cmd.length
+
         while (pos < chunk.length) {
             val escMatch = ansiPattern.find(chunk, pos)
             if (escMatch != null && escMatch.range.first == pos) {
-                // Skip escape sequence — no visible chars
+                // It's an escape sequence — keep it unless we're inside the cmd span
+                if (strippedIdx < cmdStart || strippedIdx >= cmdEnd) {
+                    result.append(escMatch.value)
+                }
                 pos = escMatch.range.last + 1
             } else {
-                rawPositions.add(pos)
+                // Visible character
+                if (strippedIdx < cmdStart || strippedIdx >= cmdEnd) {
+                    result.append(chunk[pos])
+                }
+                strippedIdx++
                 pos++
             }
         }
-
-        if (idx >= rawPositions.size || idx + cmd.length > rawPositions.size) return chunk
-
-        val rawStart = rawPositions[idx]
-        // rawEnd: position after the last char of cmd in raw string
-        val rawEnd = if (idx + cmd.length < rawPositions.size) rawPositions[idx + cmd.length]
-                     else chunk.length
-
-        return chunk.removeRange(rawStart, rawEnd)
+        return result.toString()
     }
 
     private fun stripAnsi(s: String): String =

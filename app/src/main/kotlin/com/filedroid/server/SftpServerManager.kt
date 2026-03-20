@@ -1,6 +1,7 @@
 package com.filedroid.server
 
 import org.apache.sshd.common.file.FileSystemFactory
+import org.apache.sshd.common.file.root.RootedFileSystemProvider
 import org.apache.sshd.common.keyprovider.MappedKeyPairProvider
 import org.apache.sshd.common.session.SessionContext
 import org.apache.sshd.server.SshServer
@@ -8,7 +9,6 @@ import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import java.net.InetSocketAddress
 import java.net.ServerSocket
-import java.nio.file.FileSystems
 import java.nio.file.Paths
 import java.security.KeyPairGenerator
 import javax.inject.Inject
@@ -28,7 +28,7 @@ class SftpServerManager @Inject constructor() {
 
         val rootPath = config.rootPath.ifBlank {
             android.os.Environment.getExternalStorageDirectory().absolutePath
-        }
+        }.let { java.io.File(it).canonicalPath }
 
         // MINA reads user.home as a fallback in multiple places — set it before server init
         System.setProperty("user.home", rootPath)
@@ -53,11 +53,12 @@ class SftpServerManager @Inject constructor() {
             username == config.username && password == config.password
         }
 
-        // Implement FileSystemFactory directly — returns the native FS, bypassing
-        // VirtualFileSystemFactory and its getUserHomeDir/ValidateUtils chain entirely.
+        val rootNio = Paths.get(rootPath)
+        // RootedFileSystem jails the SFTP client inside rootPath — they see / but it maps to rootPath
+        val rootedFs = RootedFileSystemProvider().newFileSystem(rootNio, emptyMap<String, Any>())
         sshd.fileSystemFactory = object : FileSystemFactory {
-            override fun getUserHomeDir(session: SessionContext) = Paths.get(rootPath)
-            override fun createFileSystem(session: SessionContext) = FileSystems.getDefault()
+            override fun getUserHomeDir(session: SessionContext) = rootedFs.getPath("/")
+            override fun createFileSystem(session: SessionContext) = rootedFs
         }
         sshd.subsystemFactories = listOf(SftpSubsystemFactory())
 

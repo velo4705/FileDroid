@@ -134,6 +134,7 @@ private fun TerminalPane(
     val hScroll = rememberScrollState()
 
     LaunchedEffect(tab.buffer) { vScroll.animateScrollTo(vScroll.maxValue) }
+    LaunchedEffect(input) { vScroll.animateScrollTo(vScroll.maxValue) }
 
     Column(modifier = modifier.background(Color.Black)) {
         when {
@@ -158,8 +159,10 @@ private fun TerminalPane(
                         cursorVisible = !cursorVisible
                     }
                 }
-                val displayText = remember(tab.buffer, cursorVisible) {
-                    parseAnsi(tab.buffer + if (cursorVisible) "█" else " ")
+                val displayText = remember(tab.buffer, input, cursorVisible) {
+                    // Show buffer as-is, then the current input on the same line as the prompt
+                    // The buffer already ends with the prompt, so just append input + cursor
+                    parseAnsi(tab.buffer + input + if (cursorVisible) "█" else " ")
                 }
                 Text(
                     text = displayText,
