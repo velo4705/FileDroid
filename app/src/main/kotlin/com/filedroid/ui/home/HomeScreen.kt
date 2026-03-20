@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +42,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
     // Re-check immediately when this screen first appears (e.g. after first-launch dialog)
     LaunchedEffect(Unit) { viewModel.refresh() }
@@ -78,6 +82,38 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // ── Network status ───────────────────────────────────────────
+            if (uiState.localIp.isNotEmpty() || uiState.publicIp.isNotEmpty()) {
+                var ipsVisible by remember { mutableStateOf(false) }
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Network", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                            TextButton(onClick = { ipsVisible = !ipsVisible }) {
+                                Text(if (ipsVisible) "Hide" else "Show", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        if (ipsVisible) {
+                            if (uiState.localIp.isNotEmpty()) {
+                                IpRow("Local (same network)", uiState.localIp) {
+                                    clipboard.setText(AnnotatedString(uiState.localIp))
+                                }
+                            }
+                            if (uiState.publicIp.isNotEmpty()) {
+                                IpRow("Public (outside network)", uiState.publicIp) {
+                                    clipboard.setText(AnnotatedString(uiState.publicIp))
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             Button(
                 onClick = onNavigateToLocalBrowser,
                 modifier = Modifier.fillMaxWidth()
@@ -170,6 +206,23 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun IpRow(label: String, ip: String, onCopy: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            Text(ip, style = MaterialTheme.typography.bodyMedium)
+        }
+        IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
         }
     }
 }

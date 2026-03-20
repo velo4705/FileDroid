@@ -274,6 +274,8 @@ Once you have the details, tap **+** on the Home screen:
 - **Username** — from `whoami` or your system username
 - **Password** — your login password, or leave blank if using a private key
 
+> **Note:** Remote connections require both devices to be on the same local network (same Wi-Fi). Connecting to another device over mobile data is not supported yet. Exception: Termux running on the same device as FileDroid always works since it's local to the device.
+
 ---
 
 ## Contributing
