@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filedroid.permission.PermissionManager
 import com.filedroid.security.CredentialStore
+import com.filedroid.tunnel.TunnelManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -28,13 +29,15 @@ data class HomeUiState(
     val storagePermissionGranted: Boolean = false,
     val canStartServer: Boolean = false,
     val localIp: String = "",
-    val publicIp: String = ""
+    val publicIp: String = "",
+    val tunnelActive: Boolean = false
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val credentialStore: CredentialStore,
     private val permissionManager: PermissionManager,
+    private val tunnelManager: TunnelManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -70,7 +73,8 @@ class HomeViewModel @Inject constructor(
             it.copy(
                 hasServerPassword = hasPassword,
                 storagePermissionGranted = hasPermission,
-                canStartServer = hasPassword && hasPermission
+                canStartServer = hasPassword && hasPermission,
+                tunnelActive = tunnelManager.isActive()
             )
         }
         fetchIps()

@@ -27,6 +27,7 @@ fun ProfileListScreen(
     val profiles by viewModel.profiles.collectAsState()
     var editTarget by remember { mutableStateOf<ConnectionProfile?>(null) }
     var editPassword by remember { mutableStateOf("") }
+    var editPassphrase by remember { mutableStateOf("") }
     var showSheet by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -59,6 +60,7 @@ fun ProfileListScreen(
                         onEdit = {
                             editTarget = profile
                             editPassword = viewModel.getPassword(profile)
+                            editPassphrase = viewModel.getPassphrase(profile)
                             showSheet = true
                         },
                         onDelete = { viewModel.delete(profile) }
@@ -73,16 +75,18 @@ fun ProfileListScreen(
         ProfileEditSheet(
             profile = editTarget,
             existingPassword = editPassword,
-            onSave = { label, protocol, host, port, user, pass, path, anon, useKey, key, phrase ->
+            existingPassphrase = editPassphrase,
+            onSave = { label, protocol, host, port, user, pass, path, anon, useKey, key, phrase, ftpsImplicit ->
                 viewModel.save(
                     id = editTarget?.id ?: 0,
                     label = label, protocol = protocol, host = host, port = port,
                     username = user, password = pass, initialPath = path, anonymous = anon,
-                    usePrivateKey = useKey, privateKey = key, passphrase = phrase
+                    usePrivateKey = useKey, privateKey = key, passphrase = phrase,
+                    ftpsImplicit = ftpsImplicit
                 )
-                showSheet = false; editTarget = null; editPassword = ""
+                showSheet = false; editTarget = null; editPassword = ""; editPassphrase = ""
             },
-            onDismiss = { showSheet = false; editTarget = null; editPassword = "" }
+            onDismiss = { showSheet = false; editTarget = null; editPassword = ""; editPassphrase = "" }
         )
     }
 }

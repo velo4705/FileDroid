@@ -12,8 +12,15 @@ import javax.inject.Inject
 class FtpClient @Inject constructor() : RemoteClient {
 
     private var client: FTPClient = FTPClient()
+    private var isFtps = false
+    private var isImplicit = false
 
-    fun useFtps() { client = FTPSClient("TLS", false) }
+    /** Configure for FTPS. [implicit] = true for implicit TLS (port 990), false for explicit AUTH TLS (port 21). */
+    fun useFtps(implicit: Boolean = false) {
+        client = FTPSClient("TLS", implicit)
+        isFtps = true
+        isImplicit = implicit
+    }
 
     override suspend fun connect(host: String, port: Int, username: String, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -21,6 +28,11 @@ class FtpClient @Inject constructor() : RemoteClient {
                 client.connectTimeout = 10_000
                 client.defaultTimeout = 10_000
                 client.connect(host, port)
+                // For explicit FTPS, send AUTH TLS after connect (before login)
+                if (isFtps && !isImplicit) {
+                    (client as FTPSClient).execPBSZ(0)
+                    (client as FTPSClient).execPROT("P")
+                }
                 check(client.login(username, password)) { "Login failed" }
                 client.enterLocalPassiveMode()
                 client.setFileType(FTP.BINARY_FILE_TYPE)

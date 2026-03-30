@@ -70,8 +70,8 @@ fun SshProfileListScreen(
     if (showSheet) {
         SshProfileEditSheet(
             profile = editTarget,
-            onSave = { label, host, port, user, pass ->
-                viewModel.save(editTarget, label, host, port, user, pass)
+            onSave = { label, host, port, user, pass, useKey, key, phrase ->
+                viewModel.save(editTarget, label, host, port, user, pass, useKey, key, phrase)
                 showSheet = false
             },
             onDismiss = { showSheet = false }
@@ -114,7 +114,8 @@ private fun SshProfileRow(
 @Composable
 private fun SshProfileEditSheet(
     profile: SshProfile?,
-    onSave: (label: String, host: String, port: Int, username: String, password: String) -> Unit,
+    onSave: (label: String, host: String, port: Int, username: String,
+             password: String, usePrivateKey: Boolean, privateKey: String, passphrase: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var label by remember { mutableStateOf(profile?.label ?: "") }
@@ -122,6 +123,9 @@ private fun SshProfileEditSheet(
     var port by remember { mutableStateOf(profile?.port?.toString() ?: "22") }
     var username by remember { mutableStateOf(profile?.username ?: "") }
     var password by remember { mutableStateOf("") }
+    var usePrivateKey by remember { mutableStateOf(profile?.usePrivateKey ?: false) }
+    var privateKey by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf("") }
 
     val portError: String? = when (val n = port.toIntOrNull()) {
         null -> "Invalid port"
@@ -151,12 +155,39 @@ private fun SshProfileEditSheet(
                 modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(value = username, onValueChange = { username = it },
                 label = { Text("Username") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(value = password, onValueChange = { password = it },
-                label = { Text(if (profile == null) "Password" else "Password (leave blank to keep)") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(), singleLine = true)
+
+            // Private key toggle
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = usePrivateKey, onCheckedChange = { usePrivateKey = it })
+                Text("Use private key authentication")
+            }
+
+            if (usePrivateKey) {
+                OutlinedTextField(
+                    value = privateKey,
+                    onValueChange = { privateKey = it },
+                    label = { Text("Private key (PEM / OpenSSH)") },
+                    placeholder = { Text("-----BEGIN OPENSSH PRIVATE KEY-----") },
+                    modifier = Modifier.fillMaxWidth().height(140.dp),
+                    maxLines = 8
+                )
+                OutlinedTextField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = { Text("Key passphrase (optional)") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            } else {
+                OutlinedTextField(value = password, onValueChange = { password = it },
+                    label = { Text(if (profile == null) "Password" else "Password (leave blank to keep)") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+            }
+
             Button(
-                onClick = { onSave(label, host, port.toInt(), username, password) },
+                onClick = { onSave(label, host, port.toInt(), username, password, usePrivateKey, privateKey, passphrase) },
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Save") }

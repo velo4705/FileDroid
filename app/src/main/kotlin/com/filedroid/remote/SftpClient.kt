@@ -46,7 +46,6 @@ class SftpClient @Inject constructor() : RemoteClient {
         runCatching<Unit> {
             val keyFile = java.io.File.createTempFile("sshj_key_", null).apply {
                 writeText(privateKeyPem)
-                deleteOnExit()
             }
             val client = SSHClient(safeConfig())
             client.addHostKeyVerifier(PromiscuousVerifier())

@@ -14,8 +14,8 @@ android {
         applicationId = "com.filedroid"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -117,6 +117,9 @@ dependencies {
 
     // Document file (folder picker support)
     implementation(libs.documentfile)
+
+    // WebSocket client (for relay tunnel)
+    implementation(libs.okhttp)
 
     // Unit tests
     testImplementation(libs.kotest.runner)

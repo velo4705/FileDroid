@@ -33,6 +33,11 @@ fun ServerControlScreen(
     var sftpChecked by remember { mutableStateOf(true) }
     val anyRunning = uiState.ftpRunning || uiState.sftpRunning
 
+    // M10 — tunnel settings
+    var tunnelEnabled by remember { mutableStateOf(uiState.tunnelEnabled) }
+    var relayUrl by remember { mutableStateOf(uiState.relayUrl) }
+    var tunnelId by remember { mutableStateOf(uiState.tunnelId) }
+
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     var pendingStart by remember { mutableStateOf<Pair<Boolean, Boolean>?>(null) }
@@ -143,6 +148,35 @@ fun ServerControlScreen(
                         selected = uiState.bindAddress,
                         onSelect = { viewModel.setBindAddress(it) }
                     )
+                }
+
+                // M10 — tunnel configuration
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Remote Access Tunnel", style = MaterialTheme.typography.labelMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = tunnelEnabled, onCheckedChange = { tunnelEnabled = it })
+                    Text("Enable relay tunnel (mobile data access)")
+                }
+                if (tunnelEnabled) {
+                    OutlinedTextField(
+                        value = relayUrl,
+                        onValueChange = { relayUrl = it },
+                        label = { Text("Relay server URL") },
+                        placeholder = { Text("wss://relay.example.com/ws") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = tunnelId,
+                        onValueChange = { tunnelId = it },
+                        label = { Text("Tunnel ID") },
+                        placeholder = { Text("my-device-123") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    viewModel.setTunnelConfig(tunnelEnabled, relayUrl, tunnelId)
                 }
             }
 

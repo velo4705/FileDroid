@@ -27,7 +27,13 @@ data class ServerUiState(
     /** R7.4 — available network interfaces (display name to IP address) */
     val availableInterfaces: List<Pair<String, String>> = emptyList(),
     /** R7.4 — selected bind address; empty = all interfaces */
-    val bindAddress: String = ""
+    val bindAddress: String = "",
+    /** M10 — tunnel enabled for remote access over mobile data */
+    val tunnelEnabled: Boolean = false,
+    /** M10 — relay server URL */
+    val relayUrl: String = "",
+    /** M10 — tunnel ID */
+    val tunnelId: String = ""
 )
 
 @HiltViewModel
@@ -43,7 +49,10 @@ class ServerViewModel @Inject constructor(
         sftpPort = credentialStore.getString(CredentialKeys.SFTP_PORT)?.toIntOrNull() ?: 2222,
         rootPath = credentialStore.getString("root_path") ?: "",
         availableInterfaces = loadNetworkInterfaces(),
-        bindAddress = credentialStore.getString("bind_address") ?: ""
+        bindAddress = credentialStore.getString("bind_address") ?: "",
+        tunnelEnabled = credentialStore.getString("tunnel_enabled") == "true",
+        relayUrl = credentialStore.getString("relay_url") ?: "",
+        tunnelId = credentialStore.getString("tunnel_id") ?: ""
     ))
     val uiState: StateFlow<ServerUiState> = _uiState.asStateFlow()
 
@@ -81,6 +90,14 @@ class ServerViewModel @Inject constructor(
         _uiState.update { it.copy(bindAddress = address) }
     }
 
+    /** M10 — persist tunnel settings */
+    fun setTunnelConfig(enabled: Boolean, relayUrl: String, tunnelId: String) {
+        credentialStore.putString("tunnel_enabled", enabled.toString())
+        credentialStore.putString("relay_url", relayUrl)
+        credentialStore.putString("tunnel_id", tunnelId)
+        _uiState.update { it.copy(tunnelEnabled = enabled, relayUrl = relayUrl, tunnelId = tunnelId) }
+    }
+
     private fun buildConfig(ftpEnabled: Boolean, sftpEnabled: Boolean) = ServerConfig(
         ftpPort = _uiState.value.ftpPort,
         sftpPort = _uiState.value.sftpPort,
@@ -89,7 +106,10 @@ class ServerViewModel @Inject constructor(
         password = credentialStore.getString(CredentialKeys.SERVER_PASSWORD) ?: "",
         ftpEnabled = ftpEnabled,
         sftpEnabled = sftpEnabled,
-        bindAddress = _uiState.value.bindAddress
+        bindAddress = _uiState.value.bindAddress,
+        tunnelEnabled = _uiState.value.tunnelEnabled,
+        relayUrl = _uiState.value.relayUrl,
+        tunnelId = _uiState.value.tunnelId
     )
 
     companion object {

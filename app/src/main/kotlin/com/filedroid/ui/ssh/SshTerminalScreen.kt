@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollState as rememberVScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,14 +36,17 @@ fun SshTerminalScreen(
     initialPort: Int = 22,
     initialUsername: String = "",
     initialPassword: String = "",
+    initialSshProfileId: Long = -1L,
     viewModel: SshTerminalViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showConnectDialog by remember { mutableStateOf(false) }
 
     // Auto-connect if launched from a profile
-    LaunchedEffect(initialHost) {
-        if (initialHost.isNotBlank() && uiState.tabs.isEmpty()) {
+    LaunchedEffect(initialHost, initialSshProfileId) {
+        if (initialSshProfileId > 0 && uiState.tabs.isEmpty()) {
+            viewModel.openSessionWithKeyFromStore(initialSshProfileId)
+        } else if (initialHost.isNotBlank() && uiState.tabs.isEmpty()) {
             viewModel.openSession(initialHost, initialPort, initialUsername, initialPassword)
         } else if (uiState.tabs.isEmpty()) {
             showConnectDialog = true
@@ -130,7 +132,7 @@ private fun TerminalPane(
     modifier: Modifier = Modifier
 ) {
     var input by remember { mutableStateOf("") }
-    val vScroll = rememberVScrollState()
+    val vScroll = rememberScrollState()
     val hScroll = rememberScrollState()
 
     LaunchedEffect(tab.buffer) { vScroll.animateScrollTo(vScroll.maxValue) }

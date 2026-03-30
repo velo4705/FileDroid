@@ -12,7 +12,7 @@ class ProtocolConverter {
 
 @Database(
     entities = [ConnectionProfile::class, SshProfile::class],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(ProtocolConverter::class)

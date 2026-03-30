@@ -32,7 +32,8 @@ class ProfileListViewModel @Inject constructor(
         anonymous: Boolean,
         usePrivateKey: Boolean = false,
         privateKey: String = "",
-        passphrase: String = ""
+        passphrase: String = "",
+        ftpsImplicit: Boolean = false
     ) {
         viewModelScope.launch {
             repo.save(
@@ -40,10 +41,12 @@ class ProfileListViewModel @Inject constructor(
                     id = id, label = label, protocol = protocol,
                     host = host, port = port, username = username,
                     credentialKey = "", initialRemotePath = initialPath,
-                    anonymous = anonymous, usePrivateKey = usePrivateKey
+                    anonymous = anonymous, usePrivateKey = usePrivateKey,
+                    ftpsImplicit = ftpsImplicit
                 ),
                 // Store private key as credential if provided, otherwise password
-                if (usePrivateKey && privateKey.isNotBlank()) privateKey else password
+                if (usePrivateKey && privateKey.isNotBlank()) privateKey else password,
+                passphrase
             )
         }
     }
@@ -54,4 +57,7 @@ class ProfileListViewModel @Inject constructor(
 
     fun getPassword(profile: ConnectionProfile): String =
         repo.getPassword(profile) ?: ""
+
+    fun getPassphrase(profile: ConnectionProfile): String =
+        repo.getPassphrase(profile) ?: ""
 }

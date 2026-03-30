@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.filedroid.update.UpdateViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,14 +40,21 @@ fun HomeScreen(
     onNavigateToTransfers: () -> Unit,
     onNavigateToServer: () -> Unit,
     onNavigateToSsh: () -> Unit,
-    viewModel: HomeViewModel = hiltViewModel()
+    onNavigateToTunnel: () -> Unit,
+    onNavigateToDualPanel: () -> Unit,
+    viewModel: HomeViewModel = hiltViewModel(),
+    updateViewModel: UpdateViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val updateState by updateViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
 
     // Re-check immediately when this screen first appears (e.g. after first-launch dialog)
     LaunchedEffect(Unit) { viewModel.refresh() }
+
+    // Auto-check for updates on first launch
+    LaunchedEffect(Unit) { updateViewModel.checkForUpdates() }
 
     // Re-check on every resume (covers returning from Settings permission page)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -67,6 +76,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("FileDroid") },
                 actions = {
+                    IconButton(onClick = { updateViewModel.checkForUpdates() }) {
+                        Icon(Icons.Default.CloudQueue, contentDescription = "Check for updates")
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
@@ -156,6 +168,28 @@ fun HomeScreen(
                 Text("SSH Manager")
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onNavigateToTunnel,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.CloudQueue, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Relay Tunnel")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onNavigateToDualPanel,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.ViewStream, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Dual Panel")
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
@@ -206,6 +240,53 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+    }
+
+    // Update dialog
+    if (updateState.showDialog && updateState.updateInfo != null) {
+        val info = updateState.updateInfo!!
+        if (info.isUpdateAvailable) {
+            AlertDialog(
+                onDismissRequest = { updateViewModel.dismissDialog() },
+                title = { Text("Update available") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Version ${info.latestVersion} is available. (Current: ${com.filedroid.BuildConfig.VERSION_NAME})")
+                        if (info.releaseNotes.isNotBlank()) {
+                            Text(
+                                info.releaseNotes.take(300),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (info.downloadUrl != null) updateViewModel.openDownload()
+                        else updateViewModel.openReleasesPage()
+                        updateViewModel.dismissDialog()
+                    }) { Text("Download") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { updateViewModel.openReleasesPage(); updateViewModel.dismissDialog() }) {
+                        Text("View release")
+                    }
+                }
+            )
+        } else if (updateState.error != null && updateState.error.contains("latest")) {
+            // "You're on the latest version" info
+            AlertDialog(
+                onDismissRequest = { updateViewModel.clearError(); updateViewModel.dismissDialog() },
+                title = { Text("Up to date") },
+                text = { Text(updateState.error) },
+                confirmButton = {
+                    TextButton(onClick = { updateViewModel.clearError(); updateViewModel.dismissDialog() }) {
+                        Text("OK")
+                    }
+                }
+            )
         }
     }
 }

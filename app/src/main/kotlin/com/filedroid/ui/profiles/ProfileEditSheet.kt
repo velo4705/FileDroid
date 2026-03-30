@@ -16,9 +16,11 @@ import com.filedroid.data.Protocol
 fun ProfileEditSheet(
     profile: ConnectionProfile?,
     existingPassword: String = "",   // pre-filled when editing
+    existingPassphrase: String = "", // pre-filled when editing key-based profile
     onSave: (label: String, protocol: Protocol, host: String, port: Int,
              username: String, password: String, initialPath: String, anonymous: Boolean,
-             usePrivateKey: Boolean, privateKey: String, passphrase: String) -> Unit,
+             usePrivateKey: Boolean, privateKey: String, passphrase: String,
+             ftpsImplicit: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     var label by remember { mutableStateOf(profile?.label ?: "") }
@@ -32,7 +34,8 @@ fun ProfileEditSheet(
     var anonymous by remember { mutableStateOf(profile?.anonymous ?: false) }
     var usePrivateKey by remember { mutableStateOf(profile?.usePrivateKey ?: false) }
     var privateKey by remember { mutableStateOf(if (profile?.usePrivateKey == true) existingPassword else "") }
-    var passphrase by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf(if (profile?.usePrivateKey == true) existingPassphrase else "") }
+    var ftpsImplicit by remember { mutableStateOf(profile?.ftpsImplicit ?: false) }
 
     val portError: String? = when (val n = port.toIntOrNull()) {
         null -> "Invalid port"
@@ -64,10 +67,36 @@ fun ProfileEditSheet(
                         selected = protocol == p,
                         onClick = {
                             protocol = p
-                            port = when (p) { Protocol.SFTP -> "22"; Protocol.FTP -> "21"; Protocol.FTPS -> "990" }
+                            port = when (p) {
+                                Protocol.SFTP -> "22"
+                                Protocol.FTP -> "21"
+                                Protocol.FTPS -> if (ftpsImplicit) "990" else "21"
+                            }
                             if (p != Protocol.SFTP) usePrivateKey = false
                         },
                         label = { Text(p.name) }
+                    )
+                }
+            }
+
+            // FTPS explicit/implicit toggle
+            if (protocol == Protocol.FTPS) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = !ftpsImplicit,
+                        onClick = {
+                            ftpsImplicit = false
+                            port = "21"
+                        },
+                        label = { Text("Explicit (AUTH TLS)") }
+                    )
+                    FilterChip(
+                        selected = ftpsImplicit,
+                        onClick = {
+                            ftpsImplicit = true
+                            port = "990"
+                        },
+                        label = { Text("Implicit (TLS)") }
                     )
                 }
             }
@@ -127,7 +156,8 @@ fun ProfileEditSheet(
             Button(
                 onClick = {
                     onSave(label, protocol, host, port.toInt(), username, password,
-                        initialPath, anonymous, usePrivateKey, privateKey, passphrase)
+                        initialPath, anonymous, usePrivateKey, privateKey, passphrase,
+                        ftpsImplicit)
                 },
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth()

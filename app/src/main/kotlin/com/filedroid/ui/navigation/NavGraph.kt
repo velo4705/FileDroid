@@ -27,6 +27,8 @@ import com.filedroid.ui.server.ServerControlScreen
 import com.filedroid.ui.ssh.SshProfileListScreen
 import com.filedroid.ui.ssh.SshTerminalScreen
 import com.filedroid.ui.transfer.TransferQueueScreen
+import com.filedroid.ui.tunnel.TunnelScreen
+import com.filedroid.ui.dual.DualPanelScreen
 
 object Routes {
     const val HOME = "home"
@@ -35,6 +37,8 @@ object Routes {
     const val REMOTE_BROWSER = "remote_browser"
     const val TRANSFERS = "transfers"
     const val SERVER = "server"
+    const val TUNNEL = "tunnel"
+    const val DUAL_PANEL = "dual_panel"
     const val SSH_PROFILES = "ssh_profiles"
     const val SSH = "ssh"
     const val SETTINGS = "settings"
@@ -66,7 +70,9 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
                 onNavigateToProfiles = { navController.navigate(Routes.PROFILES) },
                 onNavigateToTransfers = { navController.navigate(Routes.TRANSFERS) },
                 onNavigateToServer = { navController.navigate(Routes.SERVER) },
-                onNavigateToSsh = { navController.navigate(Routes.SSH_PROFILES) }
+                onNavigateToSsh = { navController.navigate(Routes.SSH_PROFILES) },
+                onNavigateToTunnel = { navController.navigate(Routes.TUNNEL) },
+                onNavigateToDualPanel = { navController.navigate(Routes.DUAL_PANEL) }
             )
         }
         composable(Routes.LOCAL_BROWSER) {
@@ -117,12 +123,16 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
             SshProfileListScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onConnect = { profile, password ->
-                    navController.navigate("${Routes.SSH}/${profile.host}/${profile.port}/${profile.username}/$password")
+                    if (profile.usePrivateKey) {
+                        navController.navigate("${Routes.SSH}/key/${profile.id}")
+                    } else {
+                        navController.navigate("${Routes.SSH}/pass/${profile.host}/${profile.port}/${profile.username}/$password")
+                    }
                 }
             )
         }
         composable(
-            route = "${Routes.SSH}/{host}/{port}/{username}/{password}",
+            route = "${Routes.SSH}/pass/{host}/{port}/{username}/{password}",
             arguments = listOf(
                 navArgument("host") { type = NavType.StringType },
                 navArgument("port") { type = NavType.IntType },
@@ -142,6 +152,16 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
                 onNavigateBack = { navController.popBackStack() }
             )
         }
+        composable(
+            route = "${Routes.SSH}/key/{profileId}",
+            arguments = listOf(navArgument("profileId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val profileId = backStackEntry.arguments?.getLong("profileId") ?: return@composable
+            SshTerminalScreen(
+                initialSshProfileId = profileId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
         composable(Routes.SSH) {
             SshTerminalScreen(onNavigateBack = { navController.popBackStack() })
         }
@@ -158,6 +178,12 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
         }
         composable(Routes.SETTINGS_SFTP) {
             SftpSettingsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Routes.TUNNEL) {
+            TunnelScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Routes.DUAL_PANEL) {
+            DualPanelScreen(onNavigateBack = { navController.popBackStack() })
         }
         // Local file editor
         composable(

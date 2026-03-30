@@ -17,5 +17,7 @@ data class ConnectionProfile(
     val credentialKey: String,
     val initialRemotePath: String = "/",
     val anonymous: Boolean = false,
-    val usePrivateKey: Boolean = false
+    val usePrivateKey: Boolean = false,
+    /** FTPS implicit mode (true = port 990 implicit TLS, false = explicit AUTH TLS on port 21). */
+    val ftpsImplicit: Boolean = false
 )

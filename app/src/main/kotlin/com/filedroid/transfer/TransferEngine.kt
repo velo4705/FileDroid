@@ -21,7 +21,7 @@ class TransferEngine @Inject constructor() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeJobs = mutableMapOf<String, Job>()
 
-    fun enqueueDownload(client: RemoteClient, remotePath: String, localPath: String, totalBytes: Long = 0L) {
+    fun enqueueDownload(client: RemoteClient, remotePath: String, localPath: String, totalBytes: Long = 0L, onDone: (() -> Unit)? = null) {
         val job = TransferJob(
             direction = TransferDirection.DOWNLOAD,
             fileName = remotePath.substringAfterLast("/"),
@@ -30,7 +30,7 @@ class TransferEngine @Inject constructor() {
             totalBytes = totalBytes
         )
         addJob(job)
-        execute(job, client)
+        execute(job, client, onDone)
     }
 
     fun enqueueUpload(client: RemoteClient, localPath: String, remotePath: String, onDone: (() -> Unit)? = null) {
@@ -47,7 +47,7 @@ class TransferEngine @Inject constructor() {
     }
 
     /** Recursively download a remote directory to a local path. */
-    fun enqueueDirectoryDownload(client: RemoteClient, remotePath: String, localPath: String) {
+    fun enqueueDirectoryDownload(client: RemoteClient, remotePath: String, localPath: String, onDone: (() -> Unit)? = null) {
         val job = TransferJob(
             direction = TransferDirection.DOWNLOAD,
             fileName = remotePath.substringAfterLast("/") + "/",
@@ -60,7 +60,10 @@ class TransferEngine @Inject constructor() {
             updateJob(job.id) { it.copy(status = TransferStatus.IN_PROGRESS) }
             val result = runCatching { downloadDirRecursive(client, remotePath, File(localPath)) }
             result.fold(
-                onSuccess = { updateJob(job.id) { it.copy(status = TransferStatus.DONE) } },
+                onSuccess = {
+                    updateJob(job.id) { it.copy(status = TransferStatus.DONE) }
+                    onDone?.invoke()
+                },
                 onFailure = { e ->
                     if (e is CancellationException) updateJob(job.id) { it.copy(status = TransferStatus.CANCELLED) }
                     else updateJob(job.id) { it.copy(status = TransferStatus.FAILED, errorMessage = e.message) }
@@ -158,7 +161,7 @@ class TransferEngine @Inject constructor() {
     }
 
     fun clearCompleted() {
-        _jobs.update { list -> list.filter { it.status == TransferStatus.IN_PROGRESS || it.status == TransferStatus.QUEUED } }
+        _jobs.update { list -> list.filter { it.status != TransferStatus.DONE && it.status != TransferStatus.FAILED && it.status != TransferStatus.CANCELLED } }
     }
 
     private fun addJob(job: TransferJob) {

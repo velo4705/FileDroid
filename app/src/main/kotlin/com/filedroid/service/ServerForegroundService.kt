@@ -32,6 +32,7 @@ class ServerForegroundService : Service() {
 
     @Inject lateinit var ftpManager: FtpServerManager
     @Inject lateinit var sftpManager: SftpServerManager
+    @Inject lateinit var tunnelManager: com.filedroid.tunnel.TunnelManager
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var activeConfig: ServerConfig? = null
@@ -109,6 +110,20 @@ class ServerForegroundService : Service() {
                     if (!resolved.ftpEnabled || !ftpManager.isRunning()) stopSelf()
                 }
             }
+            // M10 — Start relay tunnel if configured
+            if (resolved.tunnelEnabled && resolved.relayUrl.isNotBlank() && resolved.tunnelId.isNotBlank()) {
+                val tunnelConfig = com.filedroid.tunnel.TunnelConfig(
+                    relayUrl = resolved.relayUrl,
+                    tunnelId = resolved.tunnelId,
+                    username = resolved.username,
+                    password = resolved.password
+                )
+                tunnelManager.startHosting(
+                    tunnelConfig,
+                    ftpPort = if (resolved.ftpEnabled) resolved.ftpPort else 0,
+                    sftpPort = if (resolved.sftpEnabled) resolved.sftpPort else 0
+                )
+            }
         }
     }
 
@@ -116,6 +131,7 @@ class ServerForegroundService : Service() {
         serviceScope.launch {
             ftpManager.stop()
             sftpManager.stop()
+            tunnelManager.stop()
         }
         activeConfig = null
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -195,6 +211,9 @@ private fun ServerConfig.toBundle() = android.os.Bundle().apply {
     putBoolean("anonymousEnabled", anonymousEnabled)
     putInt("maxSessions", maxSessions); putInt("idleTimeout", idleTimeoutSeconds)
     putString("bindAddress", bindAddress)
+    putBoolean("tunnelEnabled", tunnelEnabled)
+    putString("relayUrl", relayUrl)
+    putString("tunnelId", tunnelId)
 }
 
 private fun android.os.Bundle.toServerConfig() = ServerConfig(
@@ -204,5 +223,8 @@ private fun android.os.Bundle.toServerConfig() = ServerConfig(
     ftpEnabled = getBoolean("ftpEnabled"), sftpEnabled = getBoolean("sftpEnabled"),
     anonymousEnabled = getBoolean("anonymousEnabled"),
     maxSessions = getInt("maxSessions", 5), idleTimeoutSeconds = getInt("idleTimeout", 300),
-    bindAddress = getString("bindAddress", "")
+    bindAddress = getString("bindAddress", ""),
+    tunnelEnabled = getBoolean("tunnelEnabled"),
+    relayUrl = getString("relayUrl", ""),
+    tunnelId = getString("tunnelId", "")
 )

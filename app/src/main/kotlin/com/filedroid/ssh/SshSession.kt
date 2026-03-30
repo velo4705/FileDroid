@@ -30,9 +30,14 @@ class SshSession(val id: String, val label: String) {
 
     private var lastHost = ""; private var lastPort = 22
     private var lastUser = ""; private var lastPass = ""
+    private var lastPrivateKey = ""; private var lastPassphrase: String? = null
+    private var lastUseKey = false
 
     private val _output = MutableSharedFlow<String>(replay = 512, extraBufferCapacity = 1024)
     val output: SharedFlow<String> = _output.asSharedFlow()
+
+    /** Accumulated buffer for echo filtering across chunks. */
+    private val echoBuffer = StringBuilder()
 
     // Last command sent (without trailing newline) — used to strip echo from output
     @Volatile private var lastSent: String = ""
@@ -40,18 +45,50 @@ class SshSession(val id: String, val label: String) {
     var isConnected = false
         private set
 
-    /** Blocking connect — call from Dispatchers.IO. */
+    /** Blocking connect with password — call from Dispatchers.IO. */
     fun connectBlocking(host: String, port: Int, username: String, password: String) {
         lastHost = host; lastPort = port; lastUser = username; lastPass = password
-        doConnect(host, port, username, password)
+        lastUseKey = false
+        doConnect(host, port, username, password = password, privateKey = null, passphrase = null)
     }
 
-    private fun doConnect(host: String, port: Int, username: String, password: String) {
+    /** Blocking connect with private key — call from Dispatchers.IO. */
+    fun connectBlockingWithKey(host: String, port: Int, username: String, privateKey: String, passphrase: String?) {
+        lastHost = host; lastPort = port; lastUser = username
+        lastPrivateKey = privateKey; lastPassphrase = passphrase; lastUseKey = true
+        doConnect(host, port, username, password = null, privateKey = privateKey, passphrase = passphrase)
+    }
+
+    private fun doConnect(
+        host: String, port: Int, username: String,
+        password: String? = null, privateKey: String? = null, passphrase: String? = null
+    ) {
         val client = SSHClient(DefaultConfig())
         client.addHostKeyVerifier(PromiscuousVerifier())
         client.connectTimeout = 10_000
         client.connect(host, port)
-        client.authPassword(username, password)
+
+        when {
+            privateKey != null -> {
+                val keyFile = java.io.File.createTempFile("ssh_key_", null).apply {
+                    writeText(privateKey)
+                }
+                try {
+                    val keyProvider = if (passphrase.isNullOrEmpty()) {
+                        client.loadKeys(keyFile.absolutePath)
+                    } else {
+                        client.loadKeys(keyFile.absolutePath, passphrase)
+                    }
+                    client.authPublickey(username, keyProvider)
+                } finally {
+                    keyFile.delete()
+                }
+            }
+            password != null -> {
+                client.authPassword(username, password)
+            }
+            else -> throw IllegalArgumentException("Either password or privateKey must be provided")
+        }
 
         val sess = client.startSession()
         sess.allocatePTY("xterm", 220, 50, 0, 0, mutableMapOf())
@@ -62,6 +99,7 @@ class SshSession(val id: String, val label: String) {
         shell = sh
         stdin = sh.outputStream
         isConnected = true
+        echoBuffer.clear()
 
         // Read loop runs in the session scope — tied to this session's lifetime
         readJob = scope.launch {
@@ -87,7 +125,13 @@ class SshSession(val id: String, val label: String) {
         repeat(3) { attempt ->
             delay(3_000L * (attempt + 1))
             runCatching {
-                withContext(Dispatchers.IO) { doConnect(lastHost, lastPort, lastUser, lastPass) }
+                withContext(Dispatchers.IO) {
+                    if (lastUseKey) {
+                        doConnect(lastHost, lastPort, lastUser, privateKey = lastPrivateKey, passphrase = lastPassphrase)
+                    } else {
+                        doConnect(lastHost, lastPort, lastUser, password = lastPass)
+                    }
+                }
             }.onSuccess {
                 _output.emit("\r\n[Reconnected]\r\n")
                 return
@@ -111,19 +155,33 @@ class SshSession(val id: String, val label: String) {
     }
 
     /**
-     * Removes the echoed command from [chunk] once, then clears lastSent so it can't
-     * match again. Walks raw+stripped in parallel to handle ANSI codes mid-echo.
+     * Removes the echoed command from [chunk]. Uses a persistent echoBuffer to handle
+     * echo that arrives across multiple read chunks (the common case on Linux/macOS/Windows).
      */
     private fun filterEcho(chunk: String): String {
         val cmd = lastSent
         if (cmd.isEmpty()) return chunk
 
-        val stripped = stripAnsi(chunk)
-        val cmdStart = stripped.indexOf(cmd)
-        if (cmdStart == -1) return chunk
+        // If the echo buffer has content, try to match against accumulated + new chunk
+        val fullEcho = echoBuffer.toString() + chunk
+        val stripped = stripAnsi(fullEcho)
 
-        // Found it — clear so we don't filter the same command again
+        val cmdStart = stripped.indexOf(cmd)
+        if (cmdStart == -1) {
+            // No match yet — buffer this chunk and wait for more data
+            echoBuffer.append(chunk)
+            // Prevent unbounded growth — if buffer gets too large, flush it
+            if (echoBuffer.length > 4096) {
+                val flushed = echoBuffer.toString()
+                echoBuffer.clear()
+                return flushed
+            }
+            return ""
+        }
+
+        // Found the echo — clear state
         lastSent = ""
+        echoBuffer.clear()
 
         val cmdEnd = cmdStart + cmd.length
         val ansiPattern = Regex("\u001B(?:\\[[?!]?[0-9;]*[A-Za-z]|\\][^\u0007\u001B]*(?:\u0007|\u001B\\\\)|[^\\[\\]])")
@@ -131,16 +189,14 @@ class SshSession(val id: String, val label: String) {
         var strippedIdx = 0
         var pos = 0
 
-        while (pos < chunk.length) {
-            val escMatch = ansiPattern.find(chunk, pos)
+        while (pos < fullEcho.length) {
+            val escMatch = ansiPattern.find(fullEcho, pos)
             if (escMatch != null && escMatch.range.first == pos) {
-                // Escape sequence — keep unless the next visible char is inside the cmd span
-                // (i.e. the escape is styling the cmd text itself)
                 val nextVisibleInCmd = strippedIdx in cmdStart until cmdEnd
                 if (!nextVisibleInCmd) result.append(escMatch.value)
                 pos = escMatch.range.last + 1
             } else {
-                if (strippedIdx !in cmdStart until cmdEnd) result.append(chunk[pos])
+                if (strippedIdx !in cmdStart until cmdEnd) result.append(fullEcho[pos])
                 strippedIdx++
                 pos++
             }
