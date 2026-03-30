@@ -88,7 +88,14 @@ class RelayClient @Inject constructor() {
         webSocket = client!!.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 // Send registration/join message
-                val msg = """{"action":"${if (role == "host") "register" else "join"}","tunnelId":"${config.tunnelId}","username":"${config.username}","password":"${config.password}"}"""
+                val msg = if (role == "host") {
+                    val portsArray = config.publicPorts.entries.joinToString(",") { (proto, port) ->
+                        """{"protocol":"$proto","port":$port}"""
+                    }
+                    """{"action":"register","tunnelId":"${config.tunnelId}","username":"${config.username}","password":"${config.password}","ports":[$portsArray]}"""
+                } else {
+                    """{"action":"join","tunnelId":"${config.tunnelId}","username":"${config.username}","password":"${config.password}"}"""
+                }
                 webSocket.send(msg)
             }
 
@@ -119,7 +126,9 @@ class RelayClient @Inject constructor() {
         when {
             text.contains("\"status\":\"ok\"") -> {
                 val addr = extractJsonValue(text, "address") ?: ""
-                _state.update { it.copy(status = TunnelStatus.CONNECTED, relayAddress = addr) }
+                // Parse public ports if present: "ports":{"ftp":3021,"sftp":3022}
+                val publicPorts = parsePortsObject(text)
+                _state.update { it.copy(status = TunnelStatus.CONNECTED, relayAddress = addr, publicPorts = publicPorts) }
                 onTunnelReady?.invoke(addr)
             }
             text.contains("\"status\":\"error\"") -> {
@@ -187,6 +196,18 @@ class RelayClient @Inject constructor() {
         fun extractJsonValue(json: String, key: String): String? {
             val pattern = "\"$key\"\\s*:\\s*\"([^\"]*)\""
             return Regex(pattern).find(json)?.groupValues?.get(1)
+        }
+
+        /**
+         * Parse a simple JSON object of string/number pairs into a map.
+         * e.g. '{"ftp":3021,"sftp":3022}' → {"ftp" to 3021, "sftp" to 3022}
+         */
+        fun parsePortsObject(json: String): Map<String, Int> {
+            val pattern = "\"ports\"\\s*:\\s*\\{([^}]*)\\}"
+            val match = Regex(pattern).find(json) ?: return emptyMap()
+            val inner = match.groupValues.getOrNull(1) ?: return emptyMap()
+            val pairs = "\"(\w+)\"\\s*:\\s*(\\d+)".toRegex()
+            return pairs.findAll(inner).associate { it.groupValues[1] to it.groupValues[2].toInt() }
         }
     }
 }

@@ -43,7 +43,7 @@ FileDroid is also available on **F-Droid** and **IzzyOnDroid**:
 - **Transfer queue** — live progress, speed indicator, cancel, and retry
 - **Server mode** — run an FTP or SFTP server on your phone so desktop clients (FileZilla, WinSCP, etc.) can connect in
 - **Dual panel** — side-by-side local and remote file browsers with transfer between panels
-- **Relay tunnel** — access your phone's servers over mobile data via a relay server (no same-network required)
+- **Relay tunnel** — access your phone's servers from anywhere via a relay server (works over mobile data, no router config needed)
 - **In-app update checker** — get notified when new versions are available
 - **SSH terminal** — interactive terminal sessions to remote hosts with ANSI color rendering
 - **Private key auth** — authenticate to SFTP servers using PEM or OpenSSH private keys
@@ -57,7 +57,7 @@ FileDroid is also available on **F-Droid** and **IzzyOnDroid**:
 
 - Android 8.0 (API 26) or higher
 - Wi-Fi or local network for server and remote client features
-- Relay tunnel (optional) — requires a relay server for mobile data access
+- Relay tunnel — access your phone's servers over mobile data (relay server included, no config needed)
 
 ---
 
@@ -280,7 +280,7 @@ Once you have the details, tap **+** on the Home screen:
 - **Username** — from `whoami` or your system username
 - **Password** — your login password, or leave blank if using a private key
 
-> **Note:** Remote connections require both devices to be on the same local network (same Wi-Fi). For mobile data access, use the **Relay Tunnel** feature — enable it on the host device in Server Control, then connect from the client device using the same relay URL and tunnel ID.
+> **Note:** Remote connections require both devices to be on the same local network (same Wi-Fi). For remote access over mobile data, use the **Relay Tunnel** feature — enable it on the host device in Server Control, then connect from the client using the same tunnel ID. The relay URL comes pre-configured; just pick a tunnel ID and go.
 
 ---
 

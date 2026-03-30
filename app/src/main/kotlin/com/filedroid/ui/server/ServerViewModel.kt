@@ -1,7 +1,10 @@
 package com.filedroid.ui.server
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.filedroid.security.CredentialKeys
 import com.filedroid.security.CredentialStore
 import com.filedroid.server.FtpServerManager
@@ -14,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.net.NetworkInterface
 import javax.inject.Inject
 
@@ -24,16 +28,14 @@ data class ServerUiState(
     val sftpPort: Int = 2222,
     val rootPath: String = "",
     val localIp: String = "",
-    /** R7.4 — available network interfaces (display name to IP address) */
     val availableInterfaces: List<Pair<String, String>> = emptyList(),
-    /** R7.4 — selected bind address; empty = all interfaces */
     val bindAddress: String = "",
-    /** M10 — tunnel enabled for remote access over mobile data */
     val tunnelEnabled: Boolean = false,
-    /** M10 — relay server URL */
     val relayUrl: String = "",
-    /** M10 — tunnel ID */
-    val tunnelId: String = ""
+    val tunnelId: String = "",
+    /** Public ports assigned by the relay — e.g. {"ftp": 3021, "sftp": 3022}
+     *  FileZilla/WinSCP can connect to these ports on the relay host. */
+    val publicPorts: Map<String, Int> = emptyMap()
 )
 
 @HiltViewModel
@@ -51,10 +53,25 @@ class ServerViewModel @Inject constructor(
         availableInterfaces = loadNetworkInterfaces(),
         bindAddress = credentialStore.getString("bind_address") ?: "",
         tunnelEnabled = credentialStore.getString("tunnel_enabled") == "true",
-        relayUrl = credentialStore.getString("relay_url") ?: "",
+        relayUrl = credentialStore.getString("relay_url") ?: com.filedroid.tunnel.TunnelConfig.DEFAULT_RELAY_URL,
         tunnelId = credentialStore.getString("tunnel_id") ?: ""
     ))
     val uiState: StateFlow<ServerUiState> = _uiState.asStateFlow()
+
+    // Listen for public ports broadcast from the tunnel service
+    private val publicPortsReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            val bundle = intent.getBundleExtra(ServerForegroundService.EXTRA_PUBLIC_PORTS) ?: return
+            val ports = bundle.keySet().associate { key -> key to bundle.getInt(key) }
+            _uiState.update { it.copy(publicPorts = ports) }
+        }
+    }
+
+    init {
+        val filter = IntentFilter(ServerForegroundService.ACTION_PUBLIC_PORTS)
+        // Use RECEIVER_NOT_EXPORTED since this is app-internal
+        context.registerReceiver(publicPortsReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+    }
 
     fun startServers(ftpEnabled: Boolean, sftpEnabled: Boolean) {
         val config = buildConfig(ftpEnabled, sftpEnabled)

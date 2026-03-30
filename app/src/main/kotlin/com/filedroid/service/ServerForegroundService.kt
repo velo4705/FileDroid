@@ -45,7 +45,9 @@ class ServerForegroundService : Service() {
     companion object {
         const val ACTION_START = "com.filedroid.START_SERVER"
         const val ACTION_STOP = "com.filedroid.STOP_SERVER"
+        const val ACTION_PUBLIC_PORTS = "com.filedroid.PUBLIC_PORTS"
         const val EXTRA_CONFIG = "server_config"
+        const val EXTRA_PUBLIC_PORTS = "public_ports"
         private const val CHANNEL_ID = "filedroid_server"
         private const val NOTIF_ID = 1001
 
@@ -112,12 +114,25 @@ class ServerForegroundService : Service() {
             }
             // M10 — Start relay tunnel if configured
             if (resolved.tunnelEnabled && resolved.relayUrl.isNotBlank() && resolved.tunnelId.isNotBlank()) {
+                val publicPorts = mutableMapOf<String, Int>()
+                if (resolved.ftpEnabled) publicPorts["ftp"] = resolved.ftpPort
+                if (resolved.sftpEnabled) publicPorts["sftp"] = resolved.sftpPort
                 val tunnelConfig = com.filedroid.tunnel.TunnelConfig(
                     relayUrl = resolved.relayUrl,
                     tunnelId = resolved.tunnelId,
                     username = resolved.username,
-                    password = resolved.password
+                    password = resolved.password,
+                    publicPorts = publicPorts
                 )
+                tunnelManager.onPublicPortsUpdated = { ports ->
+                    // Broadcast public ports for the UI to display
+                    val intent = android.content.Intent(ACTION_PUBLIC_PORTS).apply {
+                        putExtra(EXTRA_PUBLIC_PORTS, android.os.Bundle().apply {
+                            for ((k, v) in ports) putInt(k, v)
+                        })
+                    }
+                    sendBroadcast(intent)
+                }
                 tunnelManager.startHosting(
                     tunnelConfig,
                     ftpPort = if (resolved.ftpEnabled) resolved.ftpPort else 0,

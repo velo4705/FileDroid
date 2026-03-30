@@ -16,5 +16,18 @@ data class TunnelConfig(
     /** Username for relay authentication */
     val username: String = "",
     /** Password for relay authentication */
-    val password: String = ""
-)
+    val password: String = "",
+    /**
+     * Public ports to expose on the relay. Only used by hosts.
+     * Each entry maps protocol name to local port number.
+     * The relay will open TCP listeners on public ports and bridge
+     * incoming connections to these local ports through the tunnel.
+     * e.g. mapOf("ftp" to 2121, "sftp" to 2222)
+     */
+    val publicPorts: Map<String, Int> = emptyMap()
+) {
+    companion object {
+        /** Default relay server. Users can override this with their own server. */
+        const val DEFAULT_RELAY_URL = "wss://relay.filedroid.io/ws"
+    }
+}

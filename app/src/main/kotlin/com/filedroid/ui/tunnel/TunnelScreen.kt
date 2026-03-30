@@ -10,8 +10,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.filedroid.tunnel.ConnectionCode
 import com.filedroid.tunnel.TunnelStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,16 +23,12 @@ fun TunnelScreen(
     viewModel: TunnelViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-
-    var relayUrl by remember { mutableStateOf(viewModel.getRelayUrl()) }
-    var tunnelId by remember { mutableStateOf(viewModel.getTunnelId()) }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var connectionCode by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Relay Tunnel") },
+                title = { Text("Remote Access") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -45,19 +43,13 @@ fun TunnelScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                "Relay tunnel lets you access this device's FTP/SFTP servers over mobile data. " +
-                        "Connect to a relay server, share the tunnel ID with the remote client.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
             // Status card
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Tunnel Status", style = MaterialTheme.typography.titleSmall)
+                    Text("Connection Status", style = MaterialTheme.typography.titleSmall)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Badge(
                             containerColor = when (state.status) {
@@ -69,92 +61,31 @@ fun TunnelScreen(
                         ) {}
                         Text(
                             when (state.status) {
-                                TunnelStatus.CONNECTED -> "Connected to relay"
+                                TunnelStatus.CONNECTED -> "Connected"
                                 TunnelStatus.CONNECTING -> "Connecting..."
-                                TunnelStatus.ERROR -> "Error: ${state.error ?: "unknown"}"
-                                TunnelStatus.DISCONNECTED -> "Disconnected"
+                                TunnelStatus.ERROR -> "Connection failed"
+                                TunnelStatus.DISCONNECTED -> "Not connected"
                             },
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
-                    if (state.relayAddress.isNotEmpty()) {
+                    if (state.status == TunnelStatus.ERROR && state.error != null) {
                         Text(
-                            "Relay address: ${state.relayAddress}",
+                            state.error!!,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
 
-            // Connection instructions when connected
+            // Connected — show info
             if (state.status == TunnelStatus.CONNECTED) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("How to connect", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "From another FileDroid device, create a connection profile with:",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text("Host: relay server host from Relay address", style = MaterialTheme.typography.bodySmall)
-                        Text("Port: from Relay address above", style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            "Or open the Relay Tunnel screen on the client device and enter the same Relay URL and Tunnel ID.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Connection form (only when disconnected)
-            if (state.status == TunnelStatus.DISCONNECTED || state.status == TunnelStatus.ERROR) {
-                OutlinedTextField(
-                    value = relayUrl,
-                    onValueChange = { relayUrl = it },
-                    label = { Text("Relay server URL") },
-                    placeholder = { Text("wss://relay.example.com/ws") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                Text(
+                    "Connected! You can now browse the remote device's files using the connection profile.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
-                OutlinedTextField(
-                    value = tunnelId,
-                    onValueChange = { tunnelId = it },
-                    label = { Text("Tunnel ID") },
-                    placeholder = { Text("my-device-123") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("Username (optional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password (optional)") },
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                Button(
-                    onClick = { viewModel.connectAsClient(relayUrl, tunnelId, username, password) },
-                    enabled = relayUrl.isNotBlank() && tunnelId.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Connect to Relay")
-                }
-            }
-
-            // Disconnect button when connected/connecting
-            if (state.status == TunnelStatus.CONNECTED || state.status == TunnelStatus.CONNECTING) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { viewModel.disconnect() },
@@ -164,6 +95,43 @@ fun TunnelScreen(
                     Icon(Icons.Default.Stop, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Disconnect")
+                }
+            }
+
+            // Not connected — show code input
+            if (state.status == TunnelStatus.DISCONNECTED || state.status == TunnelStatus.ERROR) {
+                Text(
+                    "Enter the 4-word code shown on the other device to connect.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = connectionCode,
+                    onValueChange = { connectionCode = it.lowercase().replace(" ", "-") },
+                    label = { Text("Connection code") },
+                    placeholder = { Text("ocean-blue-river-sun") },
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val isValid = ConnectionCode.isValid(connectionCode)
+                Button(
+                    onClick = { viewModel.connectWithCode(connectionCode) },
+                    enabled = isValid,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Connect")
+                }
+
+                // Connecting indicator
+                if (state.status == TunnelStatus.CONNECTING) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
         }

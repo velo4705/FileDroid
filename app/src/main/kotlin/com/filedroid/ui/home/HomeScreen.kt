@@ -176,7 +176,7 @@ fun HomeScreen(
             ) {
                 Icon(Icons.Default.CloudQueue, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Relay Tunnel")
+                Text("Remote Access")
             }
 
             Spacer(modifier = Modifier.height(12.dp))

@@ -16,5 +16,8 @@ data class TunnelState(
     val relayAddress: String = "",
     /** Local proxy ports available for the FTP/SFTP client to connect to when tunnel is active */
     val localFtpPort: Int = 0,
-    val localSftpPort: Int = 0
+    val localSftpPort: Int = 0,
+    /** Public ports assigned by the relay, e.g. {"ftp": 3021, "sftp": 3022}
+     *  Any FTP/SFTP client worldwide can connect to these ports to reach the host. */
+    val publicPorts: Map<String, Int> = emptyMap()
 )

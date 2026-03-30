@@ -12,16 +12,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.filedroid.tunnel.ConnectionCode
+import com.filedroid.tunnel.TunnelConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,14 +37,14 @@ fun ServerControlScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     var ftpChecked by remember { mutableStateOf(true) }
     var sftpChecked by remember { mutableStateOf(true) }
     val anyRunning = uiState.ftpRunning || uiState.sftpRunning
 
-    // M10 — tunnel settings
+    // Remote access code — auto-generated, shareable
     var tunnelEnabled by remember { mutableStateOf(uiState.tunnelEnabled) }
-    var relayUrl by remember { mutableStateOf(uiState.relayUrl) }
-    var tunnelId by remember { mutableStateOf(uiState.tunnelId) }
+    var connectionCode by remember { mutableStateOf(uiState.tunnelId.ifBlank { ConnectionCode.generate() }) }
 
     LaunchedEffect(Unit) { viewModel.refresh() }
 
@@ -133,6 +139,43 @@ fun ServerControlScreen(
                 }
             }
 
+            // Public ports for external FTP clients (FileZilla, etc.)
+            if (anyRunning && uiState.publicPorts.isNotEmpty()) {
+                val relayHost = com.filedroid.tunnel.TunnelConfig.DEFAULT_RELAY_URL
+                    .removePrefix("ws://").removePrefix("wss://").removeSuffix("/ws")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Remote Access", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "FileZilla or WinSCP can connect using:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        uiState.publicPorts.forEach { (protocol, publicPort) ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "$protocol → $relayHost:$publicPort",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                                IconButton(onClick = {
+                                    clipboard.setText(AnnotatedString("$relayHost:$publicPort"))
+                                }) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Protocol toggles + interface picker (only when stopped)
             if (!anyRunning) {
                 Text("Enable protocols:", style = MaterialTheme.typography.labelMedium)
@@ -156,33 +199,67 @@ fun ServerControlScreen(
                     )
                 }
 
-                // M10 — tunnel configuration
+                // Remote access — share code with other devices
                 Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Remote Access Tunnel", style = MaterialTheme.typography.labelMedium)
+                Text("Remote Access", style = MaterialTheme.typography.labelMedium)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = tunnelEnabled, onCheckedChange = { tunnelEnabled = it })
-                    Text("Enable relay tunnel (mobile data access)")
+                    Checkbox(checked = tunnelEnabled, onCheckedChange = {
+                        tunnelEnabled = it
+                        if (it && connectionCode.isBlank()) connectionCode = ConnectionCode.generate()
+                    })
+                    Text("Access this device from anywhere")
                 }
                 if (tunnelEnabled) {
-                    OutlinedTextField(
-                        value = relayUrl,
-                        onValueChange = { relayUrl = it },
-                        label = { Text("Relay server URL") },
-                        placeholder = { Text("wss://relay.example.com/ws") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Share this code with the other device:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    OutlinedTextField(
-                        value = tunnelId,
-                        onValueChange = { tunnelId = it },
-                        label = { Text("Tunnel ID") },
-                        placeholder = { Text("my-device-123") },
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Connection code display
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    viewModel.setTunnelConfig(tunnelEnabled, relayUrl, tunnelId)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = connectionCode,
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(onClick = {
+                                    clipboard.setText(AnnotatedString(connectionCode))
+                                }) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy code")
+                                }
+                                IconButton(onClick = {
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "Connect to my FileDroid with code: $connectionCode")
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(sendIntent, "Share code"))
+                                }) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share code")
+                                }
+                            }
+                        }
+                    }
+                    TextButton(onClick = { connectionCode = ConnectionCode.generate() }) {
+                        Text("Generate new code")
+                    }
+                    // Save the config
+                    viewModel.setTunnelConfig(tunnelEnabled, TunnelConfig.DEFAULT_RELAY_URL, connectionCode)
                 }
             }
 

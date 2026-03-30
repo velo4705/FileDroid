@@ -46,6 +46,8 @@ class TunnelManager @Inject constructor(
     /**
      * Start hosting tunnel endpoints.
      * Creates local proxy sockets on the given ports and bridges them through the relay.
+     * Also requests public ports on the relay so external TCP clients (e.g. FileZilla)
+     * can connect directly to the relay's public ports to reach the host's servers.
      */
     fun startHosting(relayConfig: TunnelConfig, ftpPort: Int, sftpPort: Int) {
         relayClient.onDataReceived = { streamId, data -> handleDataFromRelay(streamId, data) }
@@ -59,7 +61,19 @@ class TunnelManager @Inject constructor(
             if (ftpPort > 0) createLocalProxy(ftpPort, "ftp", relayConfig.tunnelId)
             if (sftpPort > 0) createLocalProxy(sftpPort, "sftp", relayConfig.tunnelId)
         }
+
+        // Observe state changes to report public ports when assigned
+        scope.launch {
+            relayClient.state.collect { state ->
+                if (state.status == com.filedroid.tunnel.TunnelStatus.CONNECTED && state.publicPorts.isNotEmpty()) {
+                    onPublicPortsUpdated?.invoke(state.publicPorts)
+                }
+            }
+        }
     }
+
+    /** Callback invoked when the relay assigns public ports. */
+    var onPublicPortsUpdated: ((Map<String, Int>) -> Unit)? = null
 
     /**
      * Connect as a client to a remote host via the relay.

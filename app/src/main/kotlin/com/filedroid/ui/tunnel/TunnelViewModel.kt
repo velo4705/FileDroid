@@ -2,9 +2,9 @@ package com.filedroid.ui.tunnel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.filedroid.security.CredentialKeys
 import com.filedroid.security.CredentialStore
-import com.filedroid.tunnel.RelayClient
+import com.filedroid.tunnel.ConnectionCode
+import com.filedroid.tunnel.TunnelConfig
 import com.filedroid.tunnel.TunnelManager
 import com.filedroid.tunnel.TunnelState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,20 +20,15 @@ class TunnelViewModel @Inject constructor(
 
     val state: StateFlow<TunnelState> = tunnelManager.state
 
-    /** Saved relay URL preference. */
-    fun getRelayUrl(): String = credentialStore.getString("relay_url") ?: ""
-
-    /** Saved tunnel ID preference. */
-    fun getTunnelId(): String = credentialStore.getString("tunnel_id") ?: ""
-
-    /** Connect as tunnel client to reach a remote server over mobile data. */
-    fun connectAsClient(relayUrl: String, tunnelId: String, username: String = "", password: String = "") {
-        savePrefs(relayUrl, tunnelId)
-        val config = com.filedroid.tunnel.TunnelConfig(
-            relayUrl = relayUrl,
-            tunnelId = tunnelId,
-            username = username,
-            password = password
+    /**
+     * Connect using a human-friendly 4-word code.
+     * The code is the tunnel ID — no URL needed, uses the built-in relay.
+     */
+    fun connectWithCode(code: String) {
+        val tunnelId = ConnectionCode.toTunnelId(code)
+        val config = TunnelConfig(
+            relayUrl = TunnelConfig.DEFAULT_RELAY_URL,
+            tunnelId = tunnelId
         )
         tunnelManager.startClient(config)
     }
@@ -41,10 +36,5 @@ class TunnelViewModel @Inject constructor(
     /** Disconnect from the relay. */
     fun disconnect() {
         tunnelManager.stop()
-    }
-
-    private fun savePrefs(relayUrl: String, tunnelId: String) {
-        credentialStore.putString("relay_url", relayUrl)
-        credentialStore.putString("tunnel_id", tunnelId)
     }
 }
