@@ -206,7 +206,7 @@ class RelayClient @Inject constructor() {
             val pattern = "\"ports\"\\s*:\\s*\\{([^}]*)\\}"
             val match = Regex(pattern).find(json) ?: return emptyMap()
             val inner = match.groupValues.getOrNull(1) ?: return emptyMap()
-            val pairs = "\"(\w+)\"\\s*:\\s*(\\d+)".toRegex()
+            val pairs = "\"([a-zA-Z0-9_]+)\"\\s*:\\s*(\\d+)".toRegex()
             return pairs.findAll(inner).associate { it.groupValues[1] to it.groupValues[2].toInt() }
         }
     }
