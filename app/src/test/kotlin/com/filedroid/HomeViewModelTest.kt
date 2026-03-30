@@ -3,6 +3,7 @@ package com.filedroid
 import android.content.Context
 import com.filedroid.permission.PermissionManager
 import com.filedroid.security.CredentialStore
+import com.filedroid.tunnel.TunnelManager
 import com.filedroid.ui.home.HomeViewModel
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -34,7 +35,10 @@ class HomeViewModelTest : FunSpec() {
             val cm = mockk<android.net.ConnectivityManager>(relaxed = true)
             every { context.getSystemService(android.net.ConnectivityManager::class.java) } returns cm
 
-            return HomeViewModel(store, permManager, context)
+            val tunnelManager = mockk<TunnelManager>()
+            every { tunnelManager.isActive() } returns false
+
+            return HomeViewModel(store, permManager, tunnelManager, context)
         }
 
         test("canStartServer is false when hasServerPassword is false") {
