@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.ui.platform.LocalClipboardManager
