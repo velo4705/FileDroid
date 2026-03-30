@@ -139,38 +139,48 @@ fun ServerControlScreen(
                 }
             }
 
-            // Public ports for external FTP clients (FileZilla, etc.)
-            if (anyRunning && uiState.publicPorts.isNotEmpty()) {
-                val relayHost = com.filedroid.tunnel.TunnelConfig.DEFAULT_RELAY_URL
-                    .removePrefix("ws://").removePrefix("wss://").removeSuffix("/ws")
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Remote Access", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "FileZilla or WinSCP can connect using:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        uiState.publicPorts.forEach { (protocol, publicPort) ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "$protocol → $relayHost:$publicPort",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                )
-                                IconButton(onClick = {
-                                    clipboard.setText(AnnotatedString("$relayHost:$publicPort"))
-                                }) {
-                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
+            // Remote access tunnel status
+            val relayHost = com.filedroid.tunnel.TunnelConfig.DEFAULT_RELAY_URL
+                .removePrefix("ws://").removePrefix("wss://").removeSuffix("/ws")
+            if (anyRunning && tunnelEnabled) {
+                if (uiState.publicPorts.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Remote Access Active", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Share the connection code from the Home screen with another FileDroid device.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            uiState.publicPorts.forEach { (protocol, publicPort) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "$protocol → $relayHost:$publicPort",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                    )
+                                    IconButton(onClick = {
+                                        clipboard.setText(AnnotatedString("$relayHost:$publicPort"))
+                                    }) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
+                                    }
                                 }
                             }
+                        }
+                    }
+                } else {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Remote Access", style = MaterialTheme.typography.titleSmall)
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Text("Connecting to relay...", style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }

@@ -54,13 +54,14 @@ class TunnelManager @Inject constructor(
         relayClient.onStreamOpened = { streamId -> handleStreamOpened(streamId) }
         relayClient.onStreamClosed = { streamId -> handleStreamClosed(streamId) }
 
-        relayClient.connectAsHost(relayConfig)
-
+        // Set onTunnelReady BEFORE connecting to avoid race condition
         relayClient.onTunnelReady = { address ->
             // Create local proxy sockets that forward to the relay
             if (ftpPort > 0) createLocalProxy(ftpPort, "ftp", relayConfig.tunnelId)
             if (sftpPort > 0) createLocalProxy(sftpPort, "sftp", relayConfig.tunnelId)
         }
+
+        relayClient.connectAsHost(relayConfig)
 
         // Observe state changes to report public ports when assigned
         scope.launch {

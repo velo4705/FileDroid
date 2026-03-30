@@ -1,8 +1,6 @@
 package com.filedroid.ui.server
 
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.filedroid.security.CredentialKeys
@@ -11,6 +9,8 @@ import com.filedroid.server.FtpServerManager
 import com.filedroid.server.ServerConfig
 import com.filedroid.server.SftpServerManager
 import com.filedroid.service.ServerForegroundService
+import com.filedroid.tunnel.TunnelManager
+import com.filedroid.tunnel.TunnelStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +43,7 @@ class ServerViewModel @Inject constructor(
     private val ftpManager: FtpServerManager,
     private val sftpManager: SftpServerManager,
     private val credentialStore: CredentialStore,
+    private val tunnelManager: TunnelManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -58,19 +59,17 @@ class ServerViewModel @Inject constructor(
     ))
     val uiState: StateFlow<ServerUiState> = _uiState.asStateFlow()
 
-    // Listen for public ports broadcast from the tunnel service
-    private val publicPortsReceiver = object : android.content.BroadcastReceiver() {
-        override fun onReceive(ctx: Context, intent: Intent) {
-            val bundle = intent.getBundleExtra(ServerForegroundService.EXTRA_PUBLIC_PORTS) ?: return
-            val ports = bundle.keySet().associate { key -> key to bundle.getInt(key) }
-            _uiState.update { it.copy(publicPorts = ports) }
-        }
-    }
-
+    // Observe tunnel state for public ports
     init {
-        val filter = IntentFilter(ServerForegroundService.ACTION_PUBLIC_PORTS)
-        // Use RECEIVER_NOT_EXPORTED since this is app-internal
-        context.registerReceiver(publicPortsReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        viewModelScope.launch {
+            tunnelManager.state.collect { state ->
+                if (state.status == TunnelStatus.CONNECTED && state.publicPorts.isNotEmpty()) {
+                    _uiState.update { it.copy(publicPorts = state.publicPorts) }
+                } else if (state.status == TunnelStatus.DISCONNECTED) {
+                    _uiState.update { it.copy(publicPorts = emptyMap()) }
+                }
+            }
+        }
     }
 
     fun startServers(ftpEnabled: Boolean, sftpEnabled: Boolean) {
