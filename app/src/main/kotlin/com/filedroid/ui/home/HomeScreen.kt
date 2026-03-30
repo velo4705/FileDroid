@@ -53,8 +53,8 @@ fun HomeScreen(
     // Re-check immediately when this screen first appears (e.g. after first-launch dialog)
     LaunchedEffect(Unit) { viewModel.refresh() }
 
-    // Auto-check for updates on first launch
-    LaunchedEffect(Unit) { updateViewModel.checkForUpdates() }
+    // Auto-check for updates once per app session
+    LaunchedEffect(Unit) { updateViewModel.checkForUpdatesOnce() }
 
     // Re-check on every resume (covers returning from Settings permission page)
     val lifecycleOwner = LocalLifecycleOwner.current

@@ -29,6 +29,10 @@ class UpdateViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(UpdateUiState())
     val uiState: StateFlow<UpdateUiState> = _uiState.asStateFlow()
 
+    companion object {
+        private var hasAutoChecked = false
+    }
+
     /** Current app version code from PackageManager. */
     private val currentVersionCode: Int
         get() = context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode.toInt()
@@ -36,6 +40,13 @@ class UpdateViewModel @Inject constructor(
     /** Current app version name from PackageManager. */
     private val currentVersionName: String
         get() = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
+
+    /** Auto-check for updates once per app session. Manual checks bypass this flag. */
+    fun checkForUpdatesOnce() {
+        if (hasAutoChecked) return
+        hasAutoChecked = true
+        checkForUpdates()
+    }
 
     fun checkForUpdates() {
         _uiState.update { it.copy(isChecking = true, error = null) }
