@@ -28,6 +28,6 @@ data class TunnelConfig(
 ) {
     companion object {
         /** Default relay server. Users can override this with their own server. */
-        const val DEFAULT_RELAY_URL = "wss://relay.filedroid.io/ws"
+        const val DEFAULT_RELAY_URL = "wss://filedroid-production.up.railway.app/ws"
     }
 }
