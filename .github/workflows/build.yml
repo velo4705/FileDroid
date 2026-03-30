@@ -10,8 +10,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout
@@ -54,14 +52,3 @@ jobs:
           name: filedroid-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
-
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp app/build/outputs/apk/debug/app-debug.apk filedroid-${{ github.ref_name }}.apk
-          gh release create ${{ github.ref_name }} \
-            filedroid-${{ github.ref_name }}.apk \
-            --title "FileDroid ${{ github.ref_name }}" \
-            --generate-notes

@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ViewStream
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -252,7 +251,7 @@ fun HomeScreen(
                 title = { Text("Update available") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Version ${info.latestVersion} is available. (Current: ${com.filedroid.BuildConfig.VERSION_NAME})")
+                        Text("Version ${info.latestVersion} is available. (Current: ${context.packageManager.getPackageInfo(context.packageName, 0).versionName})")
                         if (info.releaseNotes.isNotBlank()) {
                             Text(
                                 info.releaseNotes.take(300),
@@ -275,12 +274,14 @@ fun HomeScreen(
                     }
                 }
             )
-        } else if (updateState.error != null && updateState.error.contains("latest")) {
-            // "You're on the latest version" info
-            AlertDialog(
-                onDismissRequest = { updateViewModel.clearError(); updateViewModel.dismissDialog() },
-                title = { Text("Up to date") },
-                text = { Text(updateState.error) },
+        } else {
+            val error = updateState.error
+            if (error != null && error.contains("latest")) {
+                // "You're on the latest version" info
+                AlertDialog(
+                    onDismissRequest = { updateViewModel.clearError(); updateViewModel.dismissDialog() },
+                    title = { Text("Up to date") },
+                    text = { Text(error) },
                 confirmButton = {
                     TextButton(onClick = { updateViewModel.clearError(); updateViewModel.dismissDialog() }) {
                         Text("OK")
