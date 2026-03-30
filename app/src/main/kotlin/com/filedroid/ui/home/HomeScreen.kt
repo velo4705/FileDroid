@@ -269,25 +269,30 @@ fun HomeScreen(
                     }) { Text("Download") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { updateViewModel.openReleasesPage(); updateViewModel.dismissDialog() }) {
-                        Text("View release")
-                    }
+                    TextButton(onClick = {
+                        updateViewModel.openReleasesPage()
+                        updateViewModel.dismissDialog()
+                    }) { Text("View release") }
                 }
             )
         } else {
             val error = updateState.error
             if (error != null && error.contains("latest")) {
-                // "You're on the latest version" info
                 AlertDialog(
-                    onDismissRequest = { updateViewModel.clearError(); updateViewModel.dismissDialog() },
+                    onDismissRequest = {
+                        updateViewModel.clearError()
+                        updateViewModel.dismissDialog()
+                    },
                     title = { Text("Up to date") },
                     text = { Text(error) },
-                confirmButton = {
-                    TextButton(onClick = { updateViewModel.clearError(); updateViewModel.dismissDialog() }) {
-                        Text("OK")
+                    confirmButton = {
+                        TextButton(onClick = {
+                            updateViewModel.clearError()
+                            updateViewModel.dismissDialog()
+                        }) { Text("OK") }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }
