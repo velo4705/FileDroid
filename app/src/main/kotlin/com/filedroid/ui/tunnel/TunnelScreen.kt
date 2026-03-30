@@ -105,6 +105,7 @@ fun TunnelScreen(
                         )
                     }
                 }
+            }
 
             // Connection form (only when disconnected)
             if (state.status == TunnelStatus.DISCONNECTED || state.status == TunnelStatus.ERROR) {
