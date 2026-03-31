@@ -129,9 +129,11 @@ class TunnelManager @Inject constructor(
             while (!socket.isClosed) {
                 val n = withContext(Dispatchers.IO) { input.read(buf) }
                 if (n == -1) break
+                android.util.Log.d("TunnelManager", "bridgeLocalToRelay: stream#$streamId → relay $n bytes")
                 relayClient.send(streamId, buf.copyOf(n))
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.e("TunnelManager", "bridgeLocalToRelay: stream#$streamId error: ${e.message}")
         } finally {
             handleStreamClosed(streamId)
         }
@@ -142,26 +144,32 @@ class TunnelManager @Inject constructor(
      * connect to the local FTP/SFTP server and bridge the stream.
      */
     private fun handleStreamOpenedAsHost(streamId: Int, protocol: String) {
+        android.util.Log.d("TunnelManager", "handleStreamOpenedAsHost: stream#$streamId protocol=$protocol ftpPort=$hostFtpPort sftpPort=$hostSftpPort")
         val port = when (protocol) {
             "ftp" -> hostFtpPort
             "sftp" -> hostSftpPort
             else -> {
-                // Fallback: try FTP first, then SFTP
                 if (hostFtpPort > 0) hostFtpPort
                 else if (hostSftpPort > 0) hostSftpPort
                 else return
             }
         }
-        if (port <= 0) return
+        if (port <= 0) {
+            android.util.Log.e("TunnelManager", "handleStreamOpenedAsHost: port is $port, aborting")
+            return
+        }
 
+        android.util.Log.d("TunnelManager", "handleStreamOpenedAsHost: connecting to 127.0.0.1:$port")
         scope.launch {
             try {
                 val socket = withContext(Dispatchers.IO) {
                     Socket("127.0.0.1", port)
                 }
+                android.util.Log.d("TunnelManager", "handleStreamOpenedAsHost: connected to 127.0.0.1:$port, bridging stream#$streamId")
                 bridges[streamId] = socket
                 launch { bridgeLocalToRelay(streamId, socket) }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.e("TunnelManager", "handleStreamOpenedAsHost: FAILED to connect to 127.0.0.1:$port — ${e.message}", e)
                 relayClient.sendControl(
                     """{"action":"close_stream","tunnelId":"$currentTunnelId","streamId":$streamId}"""
                 )
@@ -187,12 +195,18 @@ class TunnelManager @Inject constructor(
     }
 
     private fun handleDataFromRelay(streamId: Int, data: ByteArray) {
-        val socket = bridges[streamId] ?: return
+        val socket = bridges[streamId]
+        if (socket == null) {
+            android.util.Log.w("TunnelManager", "handleDataFromRelay: stream#$streamId — no bridge found, dropping ${data.size} bytes")
+            return
+        }
         try {
             val output = socket.getOutputStream()
             output?.write(data)
             output?.flush()
-        } catch (_: Exception) {
+            android.util.Log.d("TunnelManager", "handleDataFromRelay: stream#$streamId ← relay ${data.size} bytes")
+        } catch (e: Exception) {
+            android.util.Log.e("TunnelManager", "handleDataFromRelay: stream#$streamId write error: ${e.message}")
             handleStreamClosed(streamId)
         }
     }
