@@ -54,6 +54,16 @@ class TunnelManager @Inject constructor(
     var onPublicPortsUpdated: ((Map<String, Int>) -> Unit)? = null
 
     fun startHosting(relayConfig: TunnelConfig, ftpPort: Int, sftpPort: Int) {
+        // Close any leftover local proxies from a previous client session on this device.
+        // This prevents proxy sockets from intercepting connections meant for the SFTP server.
+        if (localProxies.isNotEmpty()) {
+            android.util.Log.w("TunnelManager", "startHosting: clearing ${localProxies.size} leftover local proxies")
+            localProxies.forEach { runCatching { it.close() } }
+            localProxies.clear()
+        }
+        bridges.clear()
+        pendingBuffers.clear()
+
         currentTunnelId = relayConfig.tunnelId
         hostFtpPort = ftpPort
         hostSftpPort = sftpPort
