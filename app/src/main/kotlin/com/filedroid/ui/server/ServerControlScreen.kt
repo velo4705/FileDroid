@@ -187,14 +187,15 @@ fun ServerControlScreen(
                 }
 
                 if (uiState.publicPorts.isNotEmpty()) {
+                    // FileZilla / FTP Client connection info
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
                     ) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Remote Access Active", style = MaterialTheme.typography.titleSmall)
+                            Text("FileZilla / FTP Client", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Share the connection code from the Home screen with another FileDroid device.",
+                                "Share these details to connect from any FTP/SFTP app (FileZilla, etc.):",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
@@ -216,6 +217,11 @@ fun ServerControlScreen(
                                     }
                                 }
                             }
+                            Text(
+                                "Use your server username and password.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
                         }
                     }
                 } else {

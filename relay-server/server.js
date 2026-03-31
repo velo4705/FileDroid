@@ -185,6 +185,10 @@ function releasePort(port) {
 /**
  * Open a TCP server on a public port.
  * Incoming TCP connections → open a stream on the host → bridge bidirectionally.
+ * 
+ * If protocol is "auto", the first bytes are inspected to determine FTP vs SFTP:
+ *   - SSH connections start with "SSH-2.0-" → route to SFTP
+ *   - Everything else → route to FTP
  */
 function openPublicPort(tunnelId, localPort, protocol) {
   const tunnel = tunnels.get(tunnelId);
@@ -198,22 +202,55 @@ function openPublicPort(tunnelId, localPort, protocol) {
     tunnel.streams = tunnel.streams || new Map();
     tunnel.streams.set(streamId, tcpSocket);
 
-    console.log(`[${ts()}] TCP → tunnel ${tunnelId}: ${tcpSocket.remoteAddress}:${tcpSocket.remotePort} → stream #${streamId} (${protocol})`);
+    if (protocol === "auto") {
+      // Auto-detect: sniff first bytes to determine FTP vs SFTP
+      // FTP clients send "USER ..." etc. SFTP clients send "SSH-2.0-..."
+      // We MUST notify the host with the correct protocol before forwarding data.
+      // Strategy: wait for the first data chunk, detect protocol, send stream_open with
+      // resolved protocol, then forward data.
+      let resolvedProtocol = "ftp"; // default
+      let notified = false;
 
-    // Notify the host that a new stream opened from a TCP client
-    sendJson(tunnel.host, {
-      event: "stream_open",
-      streamId: streamId,
-      protocol: protocol,
-      source: `${tcpSocket.remoteAddress}:${tcpSocket.remotePort}`
-    });
+      const onData = (data) => {
+        // Detect protocol from first chunk
+        const text = data.toString("ascii", 0, Math.min(data.length, 32));
+        if (text.startsWith("SSH-")) {
+          resolvedProtocol = "sftp";
+        }
 
-    // TCP → WebSocket: forward incoming data to host
-    tcpSocket.on("data", (data) => {
-      if (tunnel.host && tunnel.host.readyState === 1) {
-        tunnel.host.send(encodeStreamFrame(streamId, data), { binary: true });
-      }
-    });
+        // Send stream_open with resolved protocol
+        if (!notified) {
+          notified = true;
+          sendJson(tunnel.host, {
+            event: "stream_open",
+            streamId: streamId,
+            protocol: resolvedProtocol
+          });
+          console.log(`[${ts()}] TCP → tunnel ${tunnelId} → stream #${streamId} (${resolvedProtocol})`);
+        }
+
+        // Forward data to host
+        if (tunnel.host && tunnel.host.readyState === 1) {
+          tunnel.host.send(encodeStreamFrame(streamId, data), { binary: true });
+        }
+      };
+
+      tcpSocket.on("data", onData);
+    } else {
+      // Fixed protocol — notify host immediately, forward all data
+      sendJson(tunnel.host, {
+        event: "stream_open",
+        streamId: streamId,
+        protocol: protocol
+      });
+      console.log(`[${ts()}] TCP → tunnel ${tunnelId} → stream #${streamId} (${protocol})`);
+
+      tcpSocket.on("data", (data) => {
+        if (tunnel.host && tunnel.host.readyState === 1) {
+          tunnel.host.send(encodeStreamFrame(streamId, data), { binary: true });
+        }
+      });
+    }
 
     tcpSocket.on("close", () => {
       tunnel.streams.delete(streamId);
@@ -379,14 +416,30 @@ wss.on("connection", (ws, req) => {
       const requestedPorts = msg.ports || [];
       const openedPorts = {};
 
-      for (const entry of requestedPorts) {
-        const localPort = typeof entry === "object" ? entry.port : entry;
-        const protocol = typeof entry === "object" ? entry.protocol : "unknown";
-        const publicPort = openPublicPort(tid, localPort, protocol);
+      // Check if we should use a single multiplexed port (for Railway free plan: only 1 TCP proxy allowed)
+      const useMultiplexed = process.env.MULTIPLEX_PUBLIC_PORT === "true";
+
+      if (useMultiplexed && requestedPorts.length > 1) {
+        // Open a single TCP port that auto-detects FTP vs SFTP from the first bytes
+        const publicPort = openPublicPort(tid, 0, "auto");
         if (publicPort) {
-          openedPorts[protocol] = publicPort;
-        } else {
-          console.log(`[${ts()}] Failed to open public port for ${protocol}:${localPort}`);
+          openedPorts["auto"] = publicPort;
+          // Also register individual protocols pointing to the same port
+          for (const entry of requestedPorts) {
+            const protocol = typeof entry === "object" ? entry.protocol : "unknown";
+            openedPorts[protocol] = publicPort;
+          }
+        }
+      } else {
+        for (const entry of requestedPorts) {
+          const localPort = typeof entry === "object" ? entry.port : entry;
+          const protocol = typeof entry === "object" ? entry.protocol : "unknown";
+          const publicPort = openPublicPort(tid, localPort, protocol);
+          if (publicPort) {
+            openedPorts[protocol] = publicPort;
+          } else {
+            console.log(`[${ts()}] Failed to open public port for ${protocol}:${localPort}`);
+          }
         }
       }
 
