@@ -68,7 +68,7 @@ class TunnelManager @Inject constructor(
         hostFtpPort = ftpPort
         hostSftpPort = sftpPort
         relayClient.onDataReceived = { streamId, data -> handleDataFromRelay(streamId, data) }
-        relayClient.onStreamOpened = { streamId, protocol -> handleStreamOpenedAsHost(streamId, protocol) }
+        relayClient.onStreamOpened = { streamId, protocol, targetPort -> handleStreamOpenedAsHost(streamId, protocol, targetPort) }
         relayClient.onStreamClosed = { streamId -> handleStreamClosed(streamId) }
 
         relayClient.connectAsHost(relayConfig)
@@ -102,7 +102,7 @@ class TunnelManager @Inject constructor(
 
         currentTunnelId = relayConfig.tunnelId
         relayClient.onDataReceived = { streamId, data -> handleDataFromRelay(streamId, data) }
-        relayClient.onStreamOpened = { streamId, protocol -> handleStreamOpenedAsClient(streamId) }
+        relayClient.onStreamOpened = { streamId, protocol, _ -> handleStreamOpenedAsClient(streamId) }
         relayClient.onStreamClosed = { streamId -> handleStreamClosed(streamId) }
 
         // Create local proxy sockets only if needed
@@ -169,9 +169,13 @@ class TunnelManager @Inject constructor(
      * Host-side: when the relay sends a stream_open event (a client connected via the relay),
      * connect to the local FTP/SFTP server and bridge the stream.
      */
-    private fun handleStreamOpenedAsHost(streamId: Int, protocol: String) {
-        android.util.Log.d("TunnelManager", "handleStreamOpenedAsHost: stream#$streamId protocol=$protocol ftpPort=$hostFtpPort sftpPort=$hostSftpPort")
+    private fun handleStreamOpenedAsHost(streamId: Int, protocol: String, targetPort: Int = 0) {
+        android.util.Log.d("TunnelManager", "handleStreamOpenedAsHost: stream#$streamId protocol=$protocol targetPort=$targetPort")
         val port = when (protocol) {
+            "ftp-data" -> {
+                // FTP data connection — connect to the FTP server's passive port
+                if (targetPort > 0) targetPort else hostFtpPort
+            }
             "ftp" -> hostFtpPort
             "sftp" -> hostSftpPort
             else -> {

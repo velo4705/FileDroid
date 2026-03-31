@@ -47,6 +47,14 @@ class FtpServerManager @Inject constructor() {
         if (config.bindAddress.isNotBlank()) {
             listenerFactory.serverAddress = config.bindAddress
         }
+
+        // Configure passive data port range — used for FTP passive mode data connections.
+        // The relay needs to know these ports to bridge data connections through the tunnel.
+        val dataPortRange = org.apache.ftpserver.passive.PassivePorts()
+        // Use ports 20000-20001 for passive data connections
+        dataPortRange.setPassivePorts("20000-20001")
+        listenerFactory.passivePorts = dataPortRange
+
         factory.addListener("default", listenerFactory.createListener())
 
         // User manager

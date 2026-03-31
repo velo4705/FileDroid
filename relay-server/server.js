@@ -204,21 +204,15 @@ function openPublicPort(tunnelId, localPort, protocol) {
 
     if (protocol === "auto") {
       // Auto-detect: sniff first bytes to determine FTP vs SFTP
-      // FTP clients send "USER ..." etc. SFTP clients send "SSH-2.0-..."
-      // We MUST notify the host with the correct protocol before forwarding data.
-      // Strategy: wait for the first data chunk, detect protocol, send stream_open with
-      // resolved protocol, then forward data.
       let resolvedProtocol = "ftp"; // default
       let notified = false;
 
       const onData = (data) => {
-        // Detect protocol from first chunk
         const text = data.toString("ascii", 0, Math.min(data.length, 32));
         if (text.startsWith("SSH-")) {
           resolvedProtocol = "sftp";
         }
 
-        // Send stream_open with resolved protocol
         if (!notified) {
           notified = true;
           sendJson(tunnel.host, {
@@ -227,17 +221,38 @@ function openPublicPort(tunnelId, localPort, protocol) {
             protocol: resolvedProtocol
           });
           console.log(`[${ts()}] TCP → tunnel ${tunnelId} → stream #${streamId} (${resolvedProtocol})`);
+
+          // Mark FTP control streams for PASV response interception
+          if (resolvedProtocol === "ftp") {
+            tunnel.ftpDataServers = tunnel.ftpDataServers || new Map();
+            tunnel.ftpDataServers.set(streamId, null); // null = waiting for PASV
+          }
         }
 
-        // Forward data to host
         if (tunnel.host && tunnel.host.readyState === 1) {
           tunnel.host.send(encodeStreamFrame(streamId, data), { binary: true });
         }
       };
 
       tcpSocket.on("data", onData);
+    } else if (protocol === "ftp") {
+      // FTP control connection — mark for PASV interception
+      sendJson(tunnel.host, {
+        event: "stream_open",
+        streamId: streamId,
+        protocol: "ftp"
+      });
+      console.log(`[${ts()}] TCP → tunnel ${tunnelId} → stream #${streamId} (ftp)`);
+      tunnel.ftpDataServers = tunnel.ftpDataServers || new Map();
+      tunnel.ftpDataServers.set(streamId, null);
+
+      tcpSocket.on("data", (data) => {
+        if (tunnel.host && tunnel.host.readyState === 1) {
+          tunnel.host.send(encodeStreamFrame(streamId, data), { binary: true });
+        }
+      });
     } else {
-      // Fixed protocol — notify host immediately, forward all data
+      // Non-FTP (SFTP etc.) — forward all data directly
       sendJson(tunnel.host, {
         event: "stream_open",
         streamId: streamId,
@@ -280,6 +295,84 @@ function openPublicPort(tunnelId, localPort, protocol) {
   tunnel.publicPorts.set(localPort, publicPort);
 
   return publicPort;
+}
+
+/**
+ * Handle FTP PASV response rewriting.
+ * When the FTP server (host) responds with a PASV reply, the IP and port
+ * in the response point to the host's private network. We need to replace
+ * them with the relay's public address and an allocated public port.
+ * 
+ * Then we open that public port and bridge data connections to the host
+ * through the tunnel, using a separate data stream.
+ */
+function handleFtpPasvResponse(tunnel, controlStreamId, responseData) {
+  const text = responseData.toString("ascii");
+  const pasvMatch = text.match(/227 Entering Passive Mode \((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)/);
+  if (!pasvMatch) return null; // not a PASV response
+
+  const p1 = parseInt(pasvMatch[5]), p2 = parseInt(pasvMatch[6]);
+  const serverDataPort = p1 * 256 + p2;
+  const serverIp = `${pasvMatch[1]}.${pasvMatch[2]}.${pasvMatch[3]}.${pasvMatch[4]}`;
+
+  // Allocate a public port for the FTP data connection
+  const dataPort = allocatePort();
+  if (!dataPort) {
+    console.log(`[${ts()}] FTP PASV: no public port available`);
+    return null;
+  }
+
+  console.log(`[${ts()}] FTP PASV: host at ${serverIp}:${serverDataPort}, relay data port ${dataPort}`);
+
+  // Open a TCP server for the data connection from the FTP client
+  const dataServer = net.createServer((dataSocket) => {
+    console.log(`[${ts()}] FTP data: client connected to port ${dataPort} → forwarding to host:${serverDataPort}`);
+
+    const dataStreamId = globalStreamId++;
+    tunnel.streams.set(dataStreamId, dataSocket);
+
+    // Tell host to connect to the FTP server's passive data port
+    sendJson(tunnel.host, {
+      event: "stream_open",
+      streamId: dataStreamId,
+      protocol: "ftp-data",
+      targetPort: serverDataPort
+    });
+
+    // Bridge bidirectionally
+    dataSocket.on("data", (d) => {
+      if (tunnel.host && tunnel.host.readyState === 1) {
+        tunnel.host.send(encodeStreamFrame(dataStreamId, d), { binary: true });
+      }
+    });
+
+    dataSocket.on("close", () => {
+      tunnel.streams.delete(dataStreamId);
+      if (tunnel.host && tunnel.host.readyState === 1) {
+        sendJson(tunnel.host, { event: "stream_close", streamId: dataStreamId });
+      }
+      dataServer.close();
+      releasePort(dataPort);
+    });
+
+    dataSocket.on("error", () => { dataSocket.destroy(); });
+  });
+
+  dataServer.listen(dataPort, "0.0.0.0", () => {
+    console.log(`[${ts()}] FTP data port ${dataPort} listening`);
+  });
+
+  // Track for cleanup
+  tunnel.ftpDataServers = tunnel.ftpDataServers || new Map();
+  tunnel.ftpDataServers.set(controlStreamId, { server: dataServer, port: dataPort });
+
+  // Rewrite PASV response with relay's address
+  const relayParts = (process.env.PUBLIC_ADDRESS || getPublicAddress()).split(".").map(Number);
+  const newP1 = Math.floor(dataPort / 256);
+  const newP2 = dataPort % 256;
+  const rewritten = `227 Entering Passive Mode (${relayParts[0]},${relayParts[1]},${relayParts[2]},${relayParts[3]},${newP1},${newP2})`;
+
+  return Buffer.from(rewritten + "\r\n");
 }
 
 function closePublicPorts(tunnel) {
@@ -327,7 +420,24 @@ wss.on("connection", (ws, req) => {
         if (tunnel.streams && tunnel.streams.has(frame.streamId)) {
           const tcpSocket = tunnel.streams.get(frame.streamId);
           if (!tcpSocket.destroyed) {
-            tcpSocket.write(frame.payload);
+            // Check if this is an FTP control stream with a PASV response that needs rewriting
+            let payload = frame.payload;
+            if (tunnel.ftpDataServers && tunnel.ftpDataServers.has(frame.streamId)) {
+              const rewritten = handleFtpPasvResponse(tunnel, frame.streamId, frame.payload);
+              if (rewritten) {
+                payload = rewritten;
+                // After rewriting PASV, remove the tracking so next PASV can be handled
+                const info = tunnel.ftpDataServers.get(frame.streamId);
+                if (info) {
+                  // Keep server open for the data connection, but clear the PASV tracking
+                  // so a new PASV command can open a new data port next time
+                  setTimeout(() => {
+                    if (tunnel.ftpDataServers) tunnel.ftpDataServers.delete(frame.streamId);
+                  }, 30000); // clean up after 30s
+                }
+              }
+            }
+            tcpSocket.write(payload);
           }
         }
         // Also forward to any FileDroid clients

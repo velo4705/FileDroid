@@ -53,7 +53,7 @@ class RelayClient @Inject constructor() {
     @Volatile var onTunnelReady: ((address: String) -> Unit)? = null
 
     /** Called when the relay signals a new peer stream is open. */
-    @Volatile var onStreamOpened: ((streamId: Int, protocol: String) -> Unit)? = null
+    @Volatile var onStreamOpened: ((streamId: Int, protocol: String, targetPort: Int) -> Unit)? = null
 
     /** Called when the relay signals a peer stream is closed. */
     @Volatile var onStreamClosed: ((streamId: Int) -> Unit)? = null
@@ -147,7 +147,8 @@ class RelayClient @Inject constructor() {
             text.contains("\"event\":\"stream_open\"") -> {
                 val id = extractJsonValue(text, "streamId")?.toIntOrNull() ?: return
                 val protocol = extractJsonValue(text, "protocol") ?: "unknown"
-                onStreamOpened?.invoke(id, protocol)
+                val targetPort = extractJsonValue(text, "targetPort")?.toIntOrNull() ?: 0
+                onStreamOpened?.invoke(id, protocol, targetPort)
             }
             text.contains("\"event\":\"stream_close\"") -> {
                 val id = extractJsonValue(text, "streamId")?.toIntOrNull() ?: return
