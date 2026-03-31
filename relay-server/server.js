@@ -407,13 +407,21 @@ wss.on("connection", (ws, req) => {
       const tunnel = tunnels.get(tid);
       if (!tunnel) return;
 
-      for (const client of tunnel.clients) {
-        if (client.readyState === 1) {
-          sendJson(client, { event: "stream_open", streamId, protocol });
+      if (role === "host") {
+        // Host is opening a stream — notify all clients (e.g. public port scenario)
+        for (const client of tunnel.clients) {
+          if (client.readyState === 1) {
+            sendJson(client, { event: "stream_open", streamId, protocol });
+          }
+        }
+      } else {
+        // Client is opening a stream — notify the host
+        if (tunnel.host && tunnel.host.readyState === 1) {
+          sendJson(tunnel.host, { event: "stream_open", streamId, protocol });
         }
       }
 
-      console.log(`[${ts()}] Stream #${streamId} (${protocol}) opened on tunnel ${tid}`);
+      console.log(`[${ts()}] Stream #${streamId} (${protocol}) opened on tunnel ${tid} by ${role}`);
 
     } else if (action === "close_stream") {
       const tid = msg.tunnelId;

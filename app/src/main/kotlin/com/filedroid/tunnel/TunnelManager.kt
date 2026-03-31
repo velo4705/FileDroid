@@ -3,12 +3,8 @@ package com.filedroid.tunnel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.InputStream
-import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import javax.inject.Inject
@@ -23,9 +19,11 @@ import javax.inject.Singleton
  * - Relays data between the local server socket and the relay stream
  *
  * When acting as **client**:
- * - Opens a local ServerSocket that the FTP/SFTP client connects to
- * - For each local connection, opens a stream on the relay to the host
- * - Relays data between the local client socket and the relay stream
+ * - Opens local ServerSockets (2121 for FTP, 2222 for SFTP)
+ * - When a local FTP/SFTP client connects, sends open_stream to the relay
+ * - The relay forwards the stream to the host
+ * - The host connects to its local FTP/SFTP server and bridges data
+ * - Data flows: local client → local proxy → relay → host local server
  */
 @Singleton
 class TunnelManager @Inject constructor(
@@ -41,58 +39,67 @@ class TunnelManager @Inject constructor(
 
     private var nextStreamId = 1
 
-    val state: StateFlow<TunnelState> = relayClient.state
+    private var currentTunnelId: String = ""
 
-    /**
-     * Start hosting tunnel endpoints.
-     * Creates local proxy sockets on the given ports and bridges them through the relay.
-     * Also requests public ports on the relay so external TCP clients (e.g. FileZilla)
-     * can connect directly to the relay's public ports to reach the host's servers.
-     */
+    /** Host-side: local ports for the FTP and SFTP servers (to connect incoming streams to). */
+    private var hostFtpPort: Int = 0
+    private var hostSftpPort: Int = 0
+
+    val state = relayClient.state
+
+    /** Callback invoked when the relay assigns public ports. */
+    var onPublicPortsUpdated: ((Map<String, Int>) -> Unit)? = null
+
     fun startHosting(relayConfig: TunnelConfig, ftpPort: Int, sftpPort: Int) {
+        currentTunnelId = relayConfig.tunnelId
+        hostFtpPort = ftpPort
+        hostSftpPort = sftpPort
         relayClient.onDataReceived = { streamId, data -> handleDataFromRelay(streamId, data) }
-        relayClient.onStreamOpened = { streamId -> handleStreamOpened(streamId) }
+        relayClient.onStreamOpened = { streamId, protocol -> handleStreamOpenedAsHost(streamId, protocol) }
         relayClient.onStreamClosed = { streamId -> handleStreamClosed(streamId) }
 
-        // Set onTunnelReady BEFORE connecting to avoid race condition
         relayClient.onTunnelReady = { address ->
-            // Create local proxy sockets that forward to the relay
             if (ftpPort > 0) createLocalProxy(ftpPort, "ftp", relayConfig.tunnelId)
             if (sftpPort > 0) createLocalProxy(sftpPort, "sftp", relayConfig.tunnelId)
         }
 
         relayClient.connectAsHost(relayConfig)
 
-        // Observe state changes to report public ports when assigned
         scope.launch {
             relayClient.state.collect { state ->
-                if (state.status == com.filedroid.tunnel.TunnelStatus.CONNECTED && state.publicPorts.isNotEmpty()) {
+                if (state.status == TunnelStatus.CONNECTED && state.publicPorts.isNotEmpty()) {
                     onPublicPortsUpdated?.invoke(state.publicPorts)
                 }
             }
         }
     }
 
-    /** Callback invoked when the relay assigns public ports. */
-    var onPublicPortsUpdated: ((Map<String, Int>) -> Unit)? = null
-
     /**
      * Connect as a client to a remote host via the relay.
-     * Creates a local proxy socket so the FTP/SFTP client connects locally, then gets
-     * relayed to the remote host.
+     * Creates local proxy sockets so the FTP/SFTP client (RemoteBrowserViewModel)
+     * can connect to localhost, and the tunnel bridges through the relay to the host.
      */
-    fun startClient(relayConfig: TunnelConfig) {
+    fun startClient(relayConfig: TunnelConfig, ftpPort: Int = 2121, sftpPort: Int = 2222) {
+        currentTunnelId = relayConfig.tunnelId
         relayClient.onDataReceived = { streamId, data -> handleDataFromRelay(streamId, data) }
-        relayClient.onStreamOpened = { streamId -> handleStreamOpened(streamId) }
+        relayClient.onStreamOpened = { streamId, protocol -> handleStreamOpenedAsClient(streamId) }
         relayClient.onStreamClosed = { streamId -> handleStreamClosed(streamId) }
+
+        relayClient.onTunnelReady = { address ->
+            createLocalProxy(ftpPort, "ftp", relayConfig.tunnelId)
+            createLocalProxy(sftpPort, "sftp", relayConfig.tunnelId)
+        }
 
         relayClient.connectAsClient(relayConfig)
     }
 
+    /**
+     * Creates a local ServerSocket that accepts connections from local FTP/SFTP clients.
+     * For each accepted connection, opens a stream on the relay and bridges data.
+     */
     private fun createLocalProxy(localPort: Int, protocol: String, tunnelId: String) {
         scope.launch {
             try {
-                // Bind to localhost only — external connections go through the relay
                 val serverSocket = ServerSocket(localPort, 50, java.net.InetAddress.getByName("127.0.0.1"))
                 localProxies.add(serverSocket)
 
@@ -101,12 +108,11 @@ class TunnelManager @Inject constructor(
                     val streamId = synchronized(this) { nextStreamId++ }
                     bridges[streamId] = localSocket
 
-                    // Notify relay that a new stream is opened
+                    // Tell the relay to open a stream to the other side
                     relayClient.sendControl(
                         """{"action":"open_stream","tunnelId":"$tunnelId","streamId":$streamId,"protocol":"$protocol"}"""
                     )
 
-                    // Start reading from local socket and sending to relay
                     launch { bridgeLocalToRelay(streamId, localSocket) }
                 }
             } catch (e: Exception) {
@@ -130,9 +136,45 @@ class TunnelManager @Inject constructor(
         }
     }
 
-    private fun handleStreamOpened(streamId: Int) {
-        // For client mode — the relay tells us a stream is ready to receive data
-        // The actual bridging is done when data arrives
+    /**
+     * Host-side: when the relay sends a stream_open event (a client connected via the relay),
+     * connect to the local FTP/SFTP server and bridge the stream.
+     */
+    private fun handleStreamOpenedAsHost(streamId: Int, protocol: String) {
+        val port = when (protocol) {
+            "ftp" -> hostFtpPort
+            "sftp" -> hostSftpPort
+            else -> {
+                // Fallback: try FTP first, then SFTP
+                if (hostFtpPort > 0) hostFtpPort
+                else if (hostSftpPort > 0) hostSftpPort
+                else return
+            }
+        }
+        if (port <= 0) return
+
+        scope.launch {
+            try {
+                val socket = withContext(Dispatchers.IO) {
+                    Socket("127.0.0.1", port)
+                }
+                bridges[streamId] = socket
+                launch { bridgeLocalToRelay(streamId, socket) }
+            } catch (_: Exception) {
+                relayClient.sendControl(
+                    """{"action":"close_stream","tunnelId":"$currentTunnelId","streamId":$streamId}"""
+                )
+            }
+        }
+    }
+
+    /**
+     * Client-side: when the relay sends a stream_open event back to us,
+     * we don't need to do anything — the stream is already in our bridges map
+     * from createLocalProxy. The stream_open is just an acknowledgment.
+     */
+    private fun handleStreamOpenedAsClient(streamId: Int) {
+        // No-op: the client already has the local socket in bridges
     }
 
     private fun handleStreamClosed(streamId: Int) {

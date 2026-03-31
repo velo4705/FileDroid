@@ -116,6 +116,49 @@ async function test() {
   await new Promise((resolve) => setTimeout(resolve, 500)); // let close propagate
   console.log("Client disconnect handled ✓");
 
+  // 8b. Client opens a stream (FileDroid→FileDroid scenario)
+  // First reconnect a new client
+  const client2 = new WebSocket(`ws://localhost:${PORT}/ws`);
+  await new Promise((resolve, reject) => {
+    client2.on("open", () => client2.send(JSON.stringify({ action: "join", tunnelId: tid, username: "", password: "" })));
+    client2.once("message", (d) => {
+      const m = JSON.parse(d.toString());
+      m.status === "ok" ? resolve() : reject(new Error(m.message));
+    });
+    client2.on("error", reject);
+  });
+  console.log("Client2 joined ✓");
+
+  // Consume the client_joined event on the host side
+  await nextJson(host);
+
+  const sid2 = 99;
+  client2.send(JSON.stringify({ action: "open_stream", tunnelId: tid, streamId: sid2, protocol: "ftp" }));
+
+  // Host should receive stream_open from client
+  const openEvt2 = await nextJson(host);
+  if (openEvt2.event !== "stream_open" || openEvt2.streamId !== sid2) throw new Error("Bad stream_open from client: " + JSON.stringify(openEvt2));
+  console.log("Client→Host stream open #" + sid2 + " ✓");
+
+  // Client2 → Host binary data
+  client2.send(makeFrame(sid2, "Hello from client"), { binary: true });
+  const recvBuf3 = await nextBinary(host);
+  const recvId3 = recvBuf3.readUInt32BE(0);
+  const recvText3 = recvBuf3.slice(4).toString();
+  if (recvId3 !== sid2 || recvText3 !== "Hello from client") throw new Error("Bad client→host: " + recvId3 + "/" + recvText3);
+  console.log("Client→Host data relay ✓:", recvId3, "→", JSON.stringify(recvText3));
+
+  // Host → Client2 binary data
+  host.send(makeFrame(sid2, "Reply from host"), { binary: true });
+  const recvBuf4 = await nextBinary(client2);
+  const recvId4 = recvBuf4.readUInt32BE(0);
+  const recvText4 = recvBuf4.slice(4).toString();
+  if (recvId4 !== sid2 || recvText4 !== "Reply from host") throw new Error("Bad host→client2: " + recvId4 + "/" + recvText4);
+  console.log("Host→Client2 data relay ✓:", recvId4, "→", JSON.stringify(recvText4));
+
+  client2.close();
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
   // 8. Host registers with public ports
   const host2 = new WebSocket(`ws://localhost:${PORT}/ws`);
   await new Promise((resolve, reject) => {
