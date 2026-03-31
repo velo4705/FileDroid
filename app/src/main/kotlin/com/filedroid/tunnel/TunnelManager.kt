@@ -34,10 +34,10 @@ class TunnelManager @Inject constructor(
     /** Local proxy server sockets — these let local clients connect to the tunnel. */
     private var localProxies = mutableListOf<ServerSocket>()
 
-    /** Active stream bridges — each maps a stream ID to a local socket. */
-    private val bridges = mutableMapOf<Int, Socket>()
+    /** Active stream bridges — each maps a stream ID to a local socket. Thread-safe. */
+    private val bridges = java.util.concurrent.ConcurrentHashMap<Int, Socket>()
 
-    private var nextStreamId = 1
+    private val nextStreamId = java.util.concurrent.atomic.AtomicInteger(1)
 
     private var currentTunnelId: String = ""
 
@@ -76,18 +76,31 @@ class TunnelManager @Inject constructor(
      */
     fun startClient(relayConfig: TunnelConfig, ftpPort: Int = 2121, sftpPort: Int = 2222) {
         android.util.Log.d("TunnelManager", "startClient: tunnelId=${relayConfig.tunnelId} relay=${relayConfig.relayUrl}")
-        // Stop any existing tunnel first
-        stop()
+
+        // Only close existing proxies if ports changed (avoids killing proxies mid-use during reconnect)
+        val needsNewProxies = localProxies.isEmpty()
+                || !localProxies.any { it.localPort == ftpPort }
+                || !localProxies.any { it.localPort == sftpPort }
+
+        // Disconnect the relay cleanly — don't kill local proxies since they may still be needed
+        relayClient.disconnect()
+        bridges.clear()
+        nextStreamId.set(1)
 
         currentTunnelId = relayConfig.tunnelId
         relayClient.onDataReceived = { streamId, data -> handleDataFromRelay(streamId, data) }
         relayClient.onStreamOpened = { streamId, protocol -> handleStreamOpenedAsClient(streamId) }
         relayClient.onStreamClosed = { streamId -> handleStreamClosed(streamId) }
 
-        // Create local proxy sockets — bind synchronously on the calling thread so they're
-        // guaranteed to be listening before startClient returns.
-        if (ftpPort > 0) createLocalProxyBlocking(ftpPort, "ftp", relayConfig.tunnelId)
-        if (sftpPort > 0) createLocalProxyBlocking(sftpPort, "sftp", relayConfig.tunnelId)
+        // Create local proxy sockets only if needed
+        if (needsNewProxies) {
+            // Close old proxies first
+            localProxies.forEach { runCatching { it.close() } }
+            localProxies.clear()
+
+            if (ftpPort > 0) createLocalProxyBlocking(ftpPort, "ftp", relayConfig.tunnelId)
+            if (sftpPort > 0) createLocalProxyBlocking(sftpPort, "sftp", relayConfig.tunnelId)
+        }
 
         relayClient.connectAsClient(relayConfig)
     }
@@ -105,7 +118,7 @@ class TunnelManager @Inject constructor(
             try {
                 while (!serverSocket.isClosed) {
                     val localSocket = withContext(Dispatchers.IO) { serverSocket.accept() }
-                    val streamId = synchronized(this) { nextStreamId++ }
+                    val streamId = nextStreamId.getAndIncrement()
                     bridges[streamId] = localSocket
                     android.util.Log.d("TunnelManager", "Local proxy accepted: $protocol:$localPort → stream #$streamId")
 
@@ -187,10 +200,8 @@ class TunnelManager @Inject constructor(
     }
 
     private fun handleStreamClosed(streamId: Int) {
-        synchronized(this) {
-            bridges.remove(streamId)?.let { socket ->
-                runCatching { socket.close() }
-            }
+        bridges.remove(streamId)?.let { socket ->
+            runCatching { socket.close() }
         }
     }
 
