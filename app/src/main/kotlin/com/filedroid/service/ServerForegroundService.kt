@@ -115,12 +115,7 @@ class ServerForegroundService : Service() {
             // M10 — Start relay tunnel if configured
             if (resolved.tunnelEnabled && resolved.relayUrl.isNotBlank() && resolved.tunnelId.isNotBlank()) {
                 val publicPorts = mutableMapOf<String, Int>()
-                if (resolved.ftpEnabled) {
-                    publicPorts["ftp"] = resolved.ftpPort
-                    // Register passive data ports for FTP passive mode
-                    publicPorts["ftp-data-1"] = 20000
-                    publicPorts["ftp-data-2"] = 20001
-                }
+                if (resolved.ftpEnabled) publicPorts["ftp"] = resolved.ftpPort
                 if (resolved.sftpEnabled) publicPorts["sftp"] = resolved.sftpPort
                 val tunnelConfig = com.filedroid.tunnel.TunnelConfig(
                     relayUrl = resolved.relayUrl,
