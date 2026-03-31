@@ -65,7 +65,7 @@ async function test() {
   // 1. Host registers
   const host = new WebSocket(`ws://localhost:${PORT}/ws`);
   await new Promise((resolve, reject) => {
-    host.on("open", () => host.send(JSON.stringify({ action: "register", tunnelId: tid, username: "", password: "" })));
+    host.on("open", () => host.send(JSON.stringify({ action: "register", tunnelId: tid, username: "", password: "", deviceName: "Pixel-7" })));
     host.once("message", (d) => {
       const m = JSON.parse(d.toString());
       m.status === "ok" ? resolve() : reject(new Error(m.message));
@@ -76,15 +76,19 @@ async function test() {
 
   // 2. Client joins
   const client = new WebSocket(`ws://localhost:${PORT}/ws`);
+  let clientJoinResponse;
   await new Promise((resolve, reject) => {
-    client.on("open", () => client.send(JSON.stringify({ action: "join", tunnelId: tid, username: "", password: "" })));
+    client.on("open", () => client.send(JSON.stringify({ action: "join", tunnelId: tid, username: "", password: "", deviceName: "Galaxy-S24" })));
     client.once("message", (d) => {
       const m = JSON.parse(d.toString());
+      clientJoinResponse = m;
       m.status === "ok" ? resolve() : reject(new Error(m.message));
     });
     client.on("error", reject);
   });
-  console.log("Client joined ✓");
+  // Verify host device name is passed to client
+  if (clientJoinResponse.deviceName !== "Pixel-7") throw new Error("Expected host deviceName 'Pixel-7', got: " + clientJoinResponse.deviceName);
+  console.log("Client joined ✓ (host device: " + clientJoinResponse.deviceName + ")");
 
   // 3. Host opens stream
   const sid = 42;
@@ -120,7 +124,7 @@ async function test() {
   // First reconnect a new client
   const client2 = new WebSocket(`ws://localhost:${PORT}/ws`);
   await new Promise((resolve, reject) => {
-    client2.on("open", () => client2.send(JSON.stringify({ action: "join", tunnelId: tid, username: "", password: "" })));
+    client2.on("open", () => client2.send(JSON.stringify({ action: "join", tunnelId: tid, username: "", password: "", deviceName: "iPhone-15" })));
     client2.once("message", (d) => {
       const m = JSON.parse(d.toString());
       m.status === "ok" ? resolve() : reject(new Error(m.message));
@@ -129,8 +133,11 @@ async function test() {
   });
   console.log("Client2 joined ✓");
 
-  // Consume the client_joined event on the host side
-  await nextJson(host);
+  // Consume the client_joined event on the host side (should include deviceName)
+  const joinEvt = await nextJson(host);
+  if (joinEvt.event !== "client_joined") throw new Error("Expected client_joined, got: " + JSON.stringify(joinEvt));
+  if (joinEvt.deviceName !== "iPhone-15") throw new Error("Expected client deviceName 'iPhone-15', got: " + joinEvt.deviceName);
+  console.log("Host received client_joined from " + joinEvt.deviceName + " ✓");
 
   const sid2 = 99;
   client2.send(JSON.stringify({ action: "open_stream", tunnelId: tid, streamId: sid2, protocol: "ftp" }));

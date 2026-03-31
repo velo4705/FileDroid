@@ -315,6 +315,7 @@ wss.on("connection", (ws, req) => {
 
       const tunnel = {
         host: ws,
+        hostDeviceName: msg.deviceName || "Unknown",
         clients: new Set(),
         publicPorts: new Map(),
         tcpServers: new Map(),
@@ -388,11 +389,12 @@ wss.on("connection", (ws, req) => {
         status: "ok",
         tunnelId: tid,
         address: `${getPublicAddress()}:${PORT}`,
-        ports: publicPorts
+        ports: publicPorts,
+        deviceName: tunnel.hostDeviceName
       });
 
       if (tunnel.host && tunnel.host.readyState === 1) {
-        sendJson(tunnel.host, { event: "client_joined", clientCount: tunnel.clients.size });
+        sendJson(tunnel.host, { event: "client_joined", clientCount: tunnel.clients.size, deviceName: msg.deviceName || "Unknown" });
       }
 
       console.log(`[${ts()}] Client joined tunnel ${tid} from ${peerIp} (${tunnel.clients.size} clients)`);

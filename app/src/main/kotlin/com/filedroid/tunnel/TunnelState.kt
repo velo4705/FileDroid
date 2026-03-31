@@ -19,5 +19,7 @@ data class TunnelState(
     val localSftpPort: Int = 0,
     /** Public ports assigned by the relay, e.g. {"ftp": 3021, "sftp": 3022}
      *  Any FTP/SFTP client worldwide can connect to these ports to reach the host. */
-    val publicPorts: Map<String, Int> = emptyMap()
+    val publicPorts: Map<String, Int> = emptyMap(),
+    /** Device name of the peer (host's device name shown to client, or client count shown to host) */
+    val peerDeviceName: String = ""
 )

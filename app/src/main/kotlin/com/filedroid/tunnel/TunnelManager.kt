@@ -58,11 +58,6 @@ class TunnelManager @Inject constructor(
         relayClient.onStreamOpened = { streamId, protocol -> handleStreamOpenedAsHost(streamId, protocol) }
         relayClient.onStreamClosed = { streamId -> handleStreamClosed(streamId) }
 
-        relayClient.onTunnelReady = { address ->
-            if (ftpPort > 0) createLocalProxy(ftpPort, "ftp", relayConfig.tunnelId)
-            if (sftpPort > 0) createLocalProxy(sftpPort, "sftp", relayConfig.tunnelId)
-        }
-
         relayClient.connectAsHost(relayConfig)
 
         scope.launch {
@@ -80,33 +75,38 @@ class TunnelManager @Inject constructor(
      * can connect to localhost, and the tunnel bridges through the relay to the host.
      */
     fun startClient(relayConfig: TunnelConfig, ftpPort: Int = 2121, sftpPort: Int = 2222) {
+        // Stop any existing tunnel first
+        stop()
+
         currentTunnelId = relayConfig.tunnelId
         relayClient.onDataReceived = { streamId, data -> handleDataFromRelay(streamId, data) }
         relayClient.onStreamOpened = { streamId, protocol -> handleStreamOpenedAsClient(streamId) }
         relayClient.onStreamClosed = { streamId -> handleStreamClosed(streamId) }
 
-        relayClient.onTunnelReady = { address ->
-            createLocalProxy(ftpPort, "ftp", relayConfig.tunnelId)
-            createLocalProxy(sftpPort, "sftp", relayConfig.tunnelId)
-        }
+        // Create local proxy sockets — bind synchronously on the calling thread so they're
+        // guaranteed to be listening before startClient returns.
+        if (ftpPort > 0) createLocalProxyBlocking(ftpPort, "ftp", relayConfig.tunnelId)
+        if (sftpPort > 0) createLocalProxyBlocking(sftpPort, "sftp", relayConfig.tunnelId)
 
         relayClient.connectAsClient(relayConfig)
     }
 
     /**
-     * Creates a local ServerSocket that accepts connections from local FTP/SFTP clients.
-     * For each accepted connection, opens a stream on the relay and bridges data.
+     * Binds a local ServerSocket synchronously, then starts an async accept loop.
+     * This ensures the port is listening before the caller continues.
      */
-    private fun createLocalProxy(localPort: Int, protocol: String, tunnelId: String) {
+    private fun createLocalProxyBlocking(localPort: Int, protocol: String, tunnelId: String) {
+        val serverSocket = java.net.ServerSocket(localPort, 50, java.net.InetAddress.getByName("127.0.0.1"))
+        localProxies.add(serverSocket)
+        android.util.Log.d("TunnelManager", "Local proxy bound: $protocol://127.0.0.1:$localPort")
+
         scope.launch {
             try {
-                val serverSocket = ServerSocket(localPort, 50, java.net.InetAddress.getByName("127.0.0.1"))
-                localProxies.add(serverSocket)
-
                 while (!serverSocket.isClosed) {
-                    val localSocket = serverSocket.accept()
+                    val localSocket = withContext(Dispatchers.IO) { serverSocket.accept() }
                     val streamId = synchronized(this) { nextStreamId++ }
                     bridges[streamId] = localSocket
+                    android.util.Log.d("TunnelManager", "Local proxy accepted: $protocol:$localPort → stream #$streamId")
 
                     // Tell the relay to open a stream to the other side
                     relayClient.sendControl(
@@ -116,7 +116,7 @@ class TunnelManager @Inject constructor(
                     launch { bridgeLocalToRelay(streamId, localSocket) }
                 }
             } catch (e: Exception) {
-                // Proxy socket closed or error
+                android.util.Log.e("TunnelManager", "Local proxy accept loop FAILED on port $localPort ($protocol): ${e.message}", e)
             }
         }
     }

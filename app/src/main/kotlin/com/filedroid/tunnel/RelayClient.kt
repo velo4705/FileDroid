@@ -88,13 +88,14 @@ class RelayClient @Inject constructor() {
         webSocket = client!!.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 // Send registration/join message
+                val deviceName = android.os.Build.MODEL ?: "Unknown device"
                 val msg = if (role == "host") {
                     val portsArray = config.publicPorts.entries.joinToString(",") { (proto, port) ->
                         """{"protocol":"$proto","port":$port}"""
                     }
-                    """{"action":"register","tunnelId":"${config.tunnelId}","username":"${config.username}","password":"${config.password}","ports":[$portsArray]}"""
+                    """{"action":"register","tunnelId":"${config.tunnelId}","username":"${config.username}","password":"${config.password}","deviceName":"$deviceName","ports":[$portsArray]}"""
                 } else {
-                    """{"action":"join","tunnelId":"${config.tunnelId}","username":"${config.username}","password":"${config.password}"}"""
+                    """{"action":"join","tunnelId":"${config.tunnelId}","username":"${config.username}","password":"${config.password}","deviceName":"$deviceName"}"""
                 }
                 webSocket.send(msg)
             }
@@ -126,9 +127,9 @@ class RelayClient @Inject constructor() {
         when {
             text.contains("\"status\":\"ok\"") -> {
                 val addr = extractJsonValue(text, "address") ?: ""
-                // Parse public ports if present: "ports":{"ftp":3021,"sftp":3022}
                 val publicPorts = parsePortsObject(text)
-                _state.update { it.copy(status = TunnelStatus.CONNECTED, relayAddress = addr, publicPorts = publicPorts) }
+                val peerName = extractJsonValue(text, "deviceName") ?: ""
+                _state.update { it.copy(status = TunnelStatus.CONNECTED, relayAddress = addr, publicPorts = publicPorts, peerDeviceName = peerName) }
                 onTunnelReady?.invoke(addr)
             }
             text.contains("\"status\":\"error\"") -> {
@@ -143,6 +144,12 @@ class RelayClient @Inject constructor() {
             text.contains("\"event\":\"stream_close\"") -> {
                 val id = extractJsonValue(text, "streamId")?.toIntOrNull() ?: return
                 onStreamClosed?.invoke(id)
+            }
+            text.contains("\"event\":\"client_joined\"") -> {
+                val clientCount = extractJsonValue(text, "clientCount") ?: ""
+                val clientName = extractJsonValue(text, "deviceName") ?: ""
+                val display = if (clientName.isNotBlank()) "$clientName ($clientCount connected)" else "$clientCount connected"
+                _state.update { it.copy(peerDeviceName = display) }
             }
         }
     }

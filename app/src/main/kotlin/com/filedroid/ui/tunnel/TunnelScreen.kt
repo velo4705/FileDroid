@@ -81,11 +81,33 @@ fun TunnelScreen(
 
             // Connected — show info
             if (state.status == TunnelStatus.CONNECTED) {
+                val peerName = state.peerDeviceName
                 Text(
-                    "Connected! You can now browse the remote device's files using the connection profile.",
+                    if (peerName.isNotBlank()) "Connected to $peerName"
+                    else "Connected to remote device",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Browse remote files using these connection details:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Host: 127.0.0.1",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        Text("FTP port: 2121",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        Text("SFTP port: 2222",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        Text("Use your server username and password.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline)
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { viewModel.disconnect() },
