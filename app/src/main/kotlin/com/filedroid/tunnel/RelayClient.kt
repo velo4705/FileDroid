@@ -127,6 +127,9 @@ class RelayClient @Inject constructor() {
 
     private fun handleControlMessage(text: String) {
         // Simple JSON parsing — avoids adding a JSON dependency for minimal messages
+        if (text.contains("\"event\"") || text.contains("\"status\"")) {
+            android.util.Log.d("RelayClient", "MSG: $text")
+        }
         when {
             text.contains("\"status\":\"ok\"") -> {
                 val addr = extractJsonValue(text, "address") ?: ""
