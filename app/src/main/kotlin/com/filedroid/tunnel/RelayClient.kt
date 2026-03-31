@@ -65,7 +65,8 @@ class RelayClient @Inject constructor() {
     fun connectAsClient(config: TunnelConfig) = connect(config, "client")
 
     private fun connect(config: TunnelConfig, role: String) {
-        disconnect()
+        // Clean up any existing connection before starting a new one
+        cleanup()
 
         _state.update {
             it.copy(
@@ -89,6 +90,7 @@ class RelayClient @Inject constructor() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 // Send registration/join message
                 val deviceName = android.os.Build.MODEL ?: "Unknown device"
+                android.util.Log.d("RelayClient", "WebSocket opened, sending $role registration for tunnel ${config.tunnelId}")
                 val msg = if (role == "host") {
                     val portsArray = config.publicPorts.entries.joinToString(",") { (proto, port) ->
                         """{"protocol":"$proto","port":$port}"""
@@ -117,6 +119,7 @@ class RelayClient @Inject constructor() {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                android.util.Log.e("RelayClient", "WebSocket failure: ${t.message}", t)
                 _state.update { it.copy(status = TunnelStatus.ERROR, error = t.message) }
             }
         })
@@ -129,11 +132,13 @@ class RelayClient @Inject constructor() {
                 val addr = extractJsonValue(text, "address") ?: ""
                 val publicPorts = parsePortsObject(text)
                 val peerName = extractJsonValue(text, "deviceName") ?: ""
+                android.util.Log.d("RelayClient", "Tunnel connected! peer=$peerName relayAddr=$addr")
                 _state.update { it.copy(status = TunnelStatus.CONNECTED, relayAddress = addr, publicPorts = publicPorts, peerDeviceName = peerName) }
                 onTunnelReady?.invoke(addr)
             }
             text.contains("\"status\":\"error\"") -> {
                 val msg = extractJsonValue(text, "message") ?: "Unknown error"
+                android.util.Log.e("RelayClient", "Tunnel error: $msg")
                 _state.update { it.copy(status = TunnelStatus.ERROR, error = msg) }
             }
             text.contains("\"event\":\"stream_open\"") -> {
@@ -186,15 +191,20 @@ class RelayClient @Inject constructor() {
     }
 
     fun disconnect() {
+        cleanup()
         onTunnelReady = null
         onDataReceived = null
         onStreamOpened = null
         onStreamClosed = null
+        _state.update { TunnelState() }
+    }
+
+    /** Internal cleanup — closes WebSocket without clearing callbacks (safe to call mid-reconnect). */
+    private fun cleanup() {
         webSocket?.close(1000, "disconnect")
         webSocket = null
         client?.dispatcher?.executorService?.shutdown()
         client = null
-        _state.update { TunnelState() }
     }
 
     fun isConnected() = _state.value.status == TunnelStatus.CONNECTED

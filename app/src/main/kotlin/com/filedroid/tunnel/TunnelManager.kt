@@ -75,6 +75,7 @@ class TunnelManager @Inject constructor(
      * can connect to localhost, and the tunnel bridges through the relay to the host.
      */
     fun startClient(relayConfig: TunnelConfig, ftpPort: Int = 2121, sftpPort: Int = 2222) {
+        android.util.Log.d("TunnelManager", "startClient: tunnelId=${relayConfig.tunnelId} relay=${relayConfig.relayUrl}")
         // Stop any existing tunnel first
         stop()
 
