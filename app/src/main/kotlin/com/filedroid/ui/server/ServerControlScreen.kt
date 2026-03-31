@@ -143,6 +143,49 @@ fun ServerControlScreen(
             val relayHost = com.filedroid.tunnel.TunnelConfig.DEFAULT_RELAY_URL
                 .removePrefix("ws://").removePrefix("wss://").removeSuffix("/ws")
             if (anyRunning && tunnelEnabled) {
+                // Show the connection code even while server is running
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Connection Code", style = MaterialTheme.typography.titleSmall)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = connectionCode,
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(onClick = {
+                                    clipboard.setText(AnnotatedString(connectionCode))
+                                }) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy code")
+                                }
+                                IconButton(onClick = {
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "Connect to my FileDroid with code: $connectionCode")
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(sendIntent, "Share code"))
+                                }) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share code")
+                                }
+                            }
+                        }
+                        Text(
+                            "Give this code to other FileDroid devices to connect remotely.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+
                 if (uiState.publicPorts.isNotEmpty()) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),

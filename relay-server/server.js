@@ -95,6 +95,55 @@ function decodeStreamFrame(data) {
   return { streamId, payload };
 }
 
+// ─── Rate limiting (failed joins per IP) ──────────────────────────────
+// Prevents brute-force guessing of tunnel IDs.
+// Max 10 failed joins per IP per 60-second window. Exceeding this rate
+// results in a temporary ban (120 seconds).
+
+const MAX_FAILED_JOINS = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const BAN_DURATION_MS = 120_000;
+
+const failedJoinTracker = new Map(); // ip -> { count, windowStart, bannedUntil }
+const RATE_LIMIT_CLEANUP_INTERVAL = 300_000; // 5 minutes
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, data] of failedJoinTracker) {
+    if (data.bannedUntil && now > data.bannedUntil) {
+      failedJoinTracker.delete(ip);
+    } else if (now - data.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
+      failedJoinTracker.delete(ip);
+    }
+  }
+}, RATE_LIMIT_CLEANUP_INTERVAL);
+
+function recordFailedJoin(ip) {
+  const now = Date.now();
+  let entry = failedJoinTracker.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    entry = { count: 0, windowStart: now, bannedUntil: null };
+    failedJoinTracker.set(ip, entry);
+  }
+  entry.count++;
+  if (entry.count > MAX_FAILED_JOINS) {
+    entry.bannedUntil = now + BAN_DURATION_MS;
+    console.log(`[${ts()}] Rate limit: IP ${ip} banned for ${BAN_DURATION_MS / 1000}s (${entry.count} failed joins)`);
+    return false; // banned
+  }
+  return true; // still allowed
+}
+
+function isBanned(ip) {
+  const entry = failedJoinTracker.get(ip);
+  if (!entry || !entry.bannedUntil) return false;
+  if (Date.now() > entry.bannedUntil) {
+    failedJoinTracker.delete(ip);
+    return false;
+  }
+  return true;
+}
+
 // ─── JSON helpers ────────────────────────────────────────────────────
 
 function sendJson(ws, obj) {
@@ -364,8 +413,17 @@ wss.on("connection", (ws, req) => {
         return;
       }
 
+      // Rate limit: check if IP is banned from joining
+      if (isBanned(peerIp)) {
+        sendJson(ws, { status: "error", message: "Too many failed attempts. Try again later." });
+        ws.close(4029, "Rate limited");
+        return;
+      }
+
       const tunnel = tunnels.get(tid);
       if (!tunnel) {
+        // Record failed join attempt for rate limiting
+        recordFailedJoin(peerIp);
         sendJson(ws, { status: "error", message: "Tunnel not found" });
         ws.close(4003, "Tunnel not found");
         return;

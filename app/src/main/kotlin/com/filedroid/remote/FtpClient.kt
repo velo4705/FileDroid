@@ -25,8 +25,8 @@ class FtpClient @Inject constructor() : RemoteClient {
     override suspend fun connect(host: String, port: Int, username: String, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching<Unit> {
-                client.connectTimeout = 10_000
-                client.defaultTimeout = 10_000
+                client.connectTimeout = 60_000
+                client.defaultTimeout = 60_000
                 client.connect(host, port)
                 // For explicit FTPS, send AUTH TLS after connect (before login)
                 if (isFtps && !isImplicit) {

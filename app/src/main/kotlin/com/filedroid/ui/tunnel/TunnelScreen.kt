@@ -123,7 +123,7 @@ fun TunnelScreen(
             // Not connected — show code input
             if (state.status == TunnelStatus.DISCONNECTED || state.status == TunnelStatus.ERROR) {
                 Text(
-                    "Enter the 4-word code shown on the other device to connect.",
+                    "Enter the 5-word code shown on the other device to connect.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -132,7 +132,7 @@ fun TunnelScreen(
                     value = connectionCode,
                     onValueChange = { connectionCode = it.lowercase().replace(" ", "-") },
                     label = { Text("Connection code") },
-                    placeholder = { Text("ocean-blue-river-sun") },
+                    placeholder = { Text("ocean-phoenix-ivory-nexus-drift") },
                     textStyle = MaterialTheme.typography.headlineSmall.copy(
                         textAlign = TextAlign.Center
                     ),

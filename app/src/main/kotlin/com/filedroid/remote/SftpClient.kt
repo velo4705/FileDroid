@@ -25,7 +25,8 @@ class SftpClient @Inject constructor() : RemoteClient {
             runCatching<Unit> {
                 val client = SSHClient(safeConfig())
                 client.addHostKeyVerifier(PromiscuousVerifier())
-                client.connectTimeout = 10_000
+                client.connectTimeout = 60_000
+                client.timeout = 60_000
                 client.connect(host, port)
                 client.authPassword(username, password)
                 sftp = client.newSFTPClient()
@@ -43,14 +44,15 @@ class SftpClient @Inject constructor() : RemoteClient {
         privateKeyPem: String,
         passphrase: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching<Unit> {
-            val keyFile = java.io.File.createTempFile("sshj_key_", null).apply {
-                writeText(privateKeyPem)
-            }
-            val client = SSHClient(safeConfig())
-            client.addHostKeyVerifier(PromiscuousVerifier())
-            client.connectTimeout = 10_000
-            client.connect(host, port)
+            runCatching<Unit> {
+                val keyFile = java.io.File.createTempFile("sshj_key_", null).apply {
+                    writeText(privateKeyPem)
+                }
+                val client = SSHClient(safeConfig())
+                client.addHostKeyVerifier(PromiscuousVerifier())
+                client.connectTimeout = 60_000
+                client.timeout = 60_000
+                client.connect(host, port)
             val keyProvider: KeyProvider = if (passphrase.isNullOrEmpty()) {
                 client.loadKeys(keyFile.absolutePath)
             } else {

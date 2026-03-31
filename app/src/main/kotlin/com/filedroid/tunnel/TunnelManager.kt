@@ -37,6 +37,9 @@ class TunnelManager @Inject constructor(
     /** Active stream bridges — each maps a stream ID to a local socket. Thread-safe. */
     private val bridges = java.util.concurrent.ConcurrentHashMap<Int, Socket>()
 
+    /** Pending data buffers for streams whose local socket isn't ready yet (host-side). */
+    private val pendingBuffers = java.util.concurrent.ConcurrentHashMap<Int, java.util.concurrent.ConcurrentLinkedQueue<ByteArray>>()
+
     private val nextStreamId = java.util.concurrent.atomic.AtomicInteger(1)
 
     private var currentTunnelId: String = ""
@@ -173,15 +176,30 @@ class TunnelManager @Inject constructor(
         }
 
         android.util.Log.d("TunnelManager", "handleStreamOpenedAsHost: connecting to 127.0.0.1:$port")
+        // Create a pending buffer so data arriving before the local socket is ready gets queued
+        pendingBuffers[streamId] = java.util.concurrent.ConcurrentLinkedQueue()
+
         scope.launch {
             try {
                 val socket = withContext(Dispatchers.IO) {
                     Socket("127.0.0.1", port)
                 }
                 android.util.Log.d("TunnelManager", "handleStreamOpenedAsHost: connected to 127.0.0.1:$port, bridging stream#$streamId")
+                // Flush any data that arrived while connecting
+                val output = socket.getOutputStream()
+                val buffer = pendingBuffers.remove(streamId)
+                if (buffer != null) {
+                    while (true) {
+                        val data = buffer.poll() ?: break
+                        output.write(data)
+                        output.flush()
+                    }
+                }
                 bridges[streamId] = socket
                 launch { bridgeLocalToRelay(streamId, socket) }
             } catch (e: Exception) {
+                pendingBuffers.remove(streamId)
+                bridges.remove(streamId)
                 android.util.Log.e("TunnelManager", "handleStreamOpenedAsHost: FAILED to connect to 127.0.0.1:$port — ${e.message}", e)
                 relayClient.sendControl(
                     """{"action":"close_stream","tunnelId":"$currentTunnelId","streamId":$streamId}"""
@@ -203,22 +221,30 @@ class TunnelManager @Inject constructor(
         bridges.remove(streamId)?.let { socket ->
             runCatching { socket.close() }
         }
+        pendingBuffers.remove(streamId)
     }
 
     private fun handleDataFromRelay(streamId: Int, data: ByteArray) {
         val socket = bridges[streamId]
-        if (socket == null) {
-            android.util.Log.w("TunnelManager", "handleDataFromRelay: stream#$streamId — no bridge found, dropping ${data.size} bytes")
-            return
-        }
-        try {
-            val output = socket.getOutputStream()
-            output?.write(data)
-            output?.flush()
-            android.util.Log.d("TunnelManager", "handleDataFromRelay: stream#$streamId ← relay ${data.size} bytes")
-        } catch (e: Exception) {
-            android.util.Log.e("TunnelManager", "handleDataFromRelay: stream#$streamId write error: ${e.message}")
-            handleStreamClosed(streamId)
+        if (socket != null) {
+            try {
+                val output = socket.getOutputStream()
+                output?.write(data)
+                output?.flush()
+                android.util.Log.d("TunnelManager", "handleDataFromRelay: stream#$streamId ← relay ${data.size} bytes")
+            } catch (e: Exception) {
+                android.util.Log.e("TunnelManager", "handleDataFromRelay: stream#$streamId write error: ${e.message}")
+                handleStreamClosed(streamId)
+            }
+        } else {
+            // No bridge yet — buffer for when the local socket connects (host-side race)
+            val buffer = pendingBuffers[streamId]
+            if (buffer != null) {
+                buffer.add(data)
+                android.util.Log.d("TunnelManager", "handleDataFromRelay: stream#$streamId ← relay ${data.size} bytes (buffered)")
+            } else {
+                android.util.Log.w("TunnelManager", "handleDataFromRelay: stream#$streamId — no bridge, dropping ${data.size} bytes")
+            }
         }
     }
 
@@ -227,6 +253,7 @@ class TunnelManager @Inject constructor(
         localProxies.clear()
         bridges.values.forEach { runCatching { it.close() } }
         bridges.clear()
+        pendingBuffers.clear()
         relayClient.disconnect()
     }
 
