@@ -213,10 +213,12 @@ class RelayClient @Inject constructor() {
     fun isConnected() = _state.value.status == TunnelStatus.CONNECTED
 
     companion object {
-        /** Extract a string value from a simple JSON object (no nested objects). */
+        /** Extract a string or number value from a simple JSON object. */
         fun extractJsonValue(json: String, key: String): String? {
-            val pattern = "\"$key\"\\s*:\\s*\"([^\"]*)\""
-            return Regex(pattern).find(json)?.groupValues?.get(1)
+            // Match both quoted strings and unquoted numbers
+            val pattern = "\"$key\"\\s*:\\s*(?:\"([^\"]*)\"|([\\d.]+))"
+            val match = Regex(pattern).find(json) ?: return null
+            return match.groupValues[1].ifEmpty { match.groupValues[2] }
         }
 
         /**
