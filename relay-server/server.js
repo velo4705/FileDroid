@@ -367,15 +367,33 @@ function handleFtpPasvResponse(tunnel, controlStreamId, responseData) {
   tunnel.ftpDataServers.set(controlStreamId, { server: dataServer, port: dataPort });
 
   // Rewrite PASV response with relay's address
-  // Use PUBLIC_ADDRESS if set, otherwise 0.0.0.0 (FTP clients typically use the control connection's address)
-  const addrStr = process.env.PUBLIC_ADDRESS || getPublicAddress();
-  const addrParts = addrStr.split(".").map(Number);
-  // Validate: need 4 numeric parts
-  const relayParts = (addrParts.length === 4 && addrParts.every(n => !isNaN(n)))
-    ? addrParts : [0, 0, 0, 0];
+  // We need the actual public IP that FTP clients can reach.
+  // Railway assigns a public IP to the service — use it if available.
+  // PUBLIC_ADDRESS env var should be set to that IP.
+  // Fallback: use the Railway-provided hostname or resolve it.
+  let relayIp;
+  if (process.env.PUBLIC_ADDRESS && process.env.PUBLIC_ADDRESS !== "localhost") {
+    relayIp = process.env.PUBLIC_ADDRESS;
+  } else {
+    // Try to determine our own public-facing IP
+    // For Railway, the hostname resolves to their edge — but we need the IP
+    relayIp = getPublicAddress(); // may be "localhost" or a Railway hostname
+  }
+
+  // Validate: must be a valid IPv4 address (4 octets)
+  const addrParts = relayIp.split(".").map(Number);
+  let relayParts;
+  if (addrParts.length === 4 && addrParts.every(n => !isNaN(n) && n >= 0 && n <= 255)) {
+    relayParts = addrParts;
+  } else {
+    // Not a valid IP — use 0.0.0.0 and hope the client uses the control connection address
+    relayParts = [0, 0, 0, 0];
+  }
+
   const newP1 = Math.floor(dataPort / 256);
   const newP2 = dataPort % 256;
   const rewritten = `227 Entering Passive Mode (${relayParts[0]},${relayParts[1]},${relayParts[2]},${relayParts[3]},${newP1},${newP2})`;
+  console.log(`[${ts()}] FTP PASV rewritten: ${text.trim()} → ${rewritten}`);
 
   return Buffer.from(rewritten + "\r\n");
 }
