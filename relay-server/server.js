@@ -367,7 +367,12 @@ function handleFtpPasvResponse(tunnel, controlStreamId, responseData) {
   tunnel.ftpDataServers.set(controlStreamId, { server: dataServer, port: dataPort });
 
   // Rewrite PASV response with relay's address
-  const relayParts = (process.env.PUBLIC_ADDRESS || getPublicAddress()).split(".").map(Number);
+  // Use PUBLIC_ADDRESS if set, otherwise 0.0.0.0 (FTP clients typically use the control connection's address)
+  const addrStr = process.env.PUBLIC_ADDRESS || getPublicAddress();
+  const addrParts = addrStr.split(".").map(Number);
+  // Validate: need 4 numeric parts
+  const relayParts = (addrParts.length === 4 && addrParts.every(n => !isNaN(n)))
+    ? addrParts : [0, 0, 0, 0];
   const newP1 = Math.floor(dataPort / 256);
   const newP2 = dataPort % 256;
   const rewritten = `227 Entering Passive Mode (${relayParts[0]},${relayParts[1]},${relayParts[2]},${relayParts[3]},${newP1},${newP2})`;
