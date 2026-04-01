@@ -187,7 +187,7 @@ fun ServerControlScreen(
                 }
 
                 if (uiState.publicPorts.isNotEmpty()) {
-                    // FileZilla / FTP Client connection info
+                    // FileZilla support — coming in a later release
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
@@ -195,68 +195,9 @@ fun ServerControlScreen(
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("FileZilla / FTP Client", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Share these details to connect from any FTP/SFTP app (FileZilla, etc.):",
+                                "FileZilla support is coming in a later release.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            // Direct connection info
-                            if (uiState.publicIp.isNotBlank() && uiState.publicIp != "Unable to detect") {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "FTP: ${uiState.publicIp}:${uiState.ftpPort}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                    )
-                                    IconButton(onClick = {
-                                        clipboard.setText(AnnotatedString("${uiState.publicIp}:${uiState.ftpPort}"))
-                                    }) {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "SFTP: ${uiState.publicIp}:${uiState.sftpPort}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                    )
-                                    IconButton(onClick = {
-                                        clipboard.setText(AnnotatedString("${uiState.publicIp}:${uiState.sftpPort}"))
-                                    }) {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-                            // Relay connection info (fallback)
-                            uiState.publicPorts.forEach { (protocol, publicPort) ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "$protocol → $relayHost:$publicPort",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                    )
-                                    IconButton(onClick = {
-                                        clipboard.setText(AnnotatedString("$relayHost:$publicPort"))
-                                    }) {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-                            Text(
-                                "Use your server username and password. Direct connection is fastest.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
                             )
                         }
                     }

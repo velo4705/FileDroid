@@ -28,7 +28,7 @@ import com.filedroid.ui.ssh.SshProfileListScreen
 import com.filedroid.ui.ssh.SshTerminalScreen
 import com.filedroid.ui.transfer.TransferQueueScreen
 import com.filedroid.ui.tunnel.TunnelScreen
-import com.filedroid.ui.dual.DualPanelScreen
+
 
 object Routes {
     const val HOME = "home"
@@ -38,7 +38,6 @@ object Routes {
     const val TRANSFERS = "transfers"
     const val SERVER = "server"
     const val TUNNEL = "tunnel"
-    const val DUAL_PANEL = "dual_panel"
     const val SSH_PROFILES = "ssh_profiles"
     const val SSH = "ssh"
     const val SETTINGS = "settings"
@@ -71,8 +70,7 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
                 onNavigateToTransfers = { navController.navigate(Routes.TRANSFERS) },
                 onNavigateToServer = { navController.navigate(Routes.SERVER) },
                 onNavigateToSsh = { navController.navigate(Routes.SSH_PROFILES) },
-                onNavigateToTunnel = { navController.navigate(Routes.TUNNEL) },
-                onNavigateToDualPanel = { navController.navigate(Routes.DUAL_PANEL) }
+                onNavigateToTunnel = { navController.navigate(Routes.TUNNEL) }
             )
         }
         composable(Routes.LOCAL_BROWSER) {
@@ -181,9 +179,6 @@ fun NavGraph(navController: NavHostController, themeViewModel: ThemeViewModel) {
         }
         composable(Routes.TUNNEL) {
             TunnelScreen(onNavigateBack = { navController.popBackStack() })
-        }
-        composable(Routes.DUAL_PANEL) {
-            DualPanelScreen(onNavigateBack = { navController.popBackStack() })
         }
         // Local file editor
         composable(

@@ -41,7 +41,6 @@ fun HomeScreen(
     onNavigateToServer: () -> Unit,
     onNavigateToSsh: () -> Unit,
     onNavigateToTunnel: () -> Unit,
-    onNavigateToDualPanel: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
     updateViewModel: UpdateViewModel = hiltViewModel()
 ) {
@@ -180,17 +179,6 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = onNavigateToDualPanel,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.ViewStream, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Dual Panel")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = onNavigateToServer,

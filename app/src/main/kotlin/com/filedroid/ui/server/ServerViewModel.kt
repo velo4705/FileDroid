@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.net.NetworkInterface
 import javax.inject.Inject
 
@@ -29,7 +28,6 @@ data class ServerUiState(
     val sftpPort: Int = 2222,
     val rootPath: String = "",
     val localIp: String = "",
-    val publicIp: String = "",
     val availableInterfaces: List<Pair<String, String>> = emptyList(),
     val bindAddress: String = "",
     val tunnelEnabled: Boolean = false,
@@ -78,31 +76,6 @@ class ServerViewModel @Inject constructor(
         val config = buildConfig(ftpEnabled, sftpEnabled)
         context.startForegroundService(ServerForegroundService.startIntent(context, config))
         _uiState.update { it.copy(ftpRunning = ftpEnabled, sftpRunning = sftpEnabled) }
-        // Fetch public IP for direct connection display
-        fetchPublicIp()
-    }
-
-    private fun fetchPublicIp() {
-        viewModelScope.launch {
-            try {
-                val url = java.net.URL("https://api.ipify.org")
-                val ip = withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    url.openStream().bufferedReader().readText().trim()
-                }
-                _uiState.update { it.copy(publicIp = ip) }
-            } catch (_: Exception) {
-                // Try fallback
-                try {
-                    val url = java.net.URL("https://ifconfig.me/ip")
-                    val ip = withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        url.openStream().bufferedReader().readText().trim()
-                    }
-                    _uiState.update { it.copy(publicIp = ip) }
-                } catch (_: Exception) {
-                    _uiState.update { it.copy(publicIp = "Unable to detect") }
-                }
-            }
-        }
     }
 
     fun stopServers() {
