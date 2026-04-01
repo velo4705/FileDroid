@@ -45,7 +45,7 @@ class UpdateChecker @Inject constructor() {
             val json = URL(RELEASES_API).readText()
             val release = JSONObject(json)
 
-            val tagName = release.optString("tag_name", "").removePrefix("v")
+            val tagName = release.optString("tag_name", "").removePrefix("v").trim()
             val releaseNotes = release.optString("body", "No release notes.")
             val htmlUrl = release.optString("html_url", RELEASES_PAGE)
 
@@ -55,7 +55,8 @@ class UpdateChecker @Inject constructor() {
 
             // Parse version from tag (e.g., "2.0.0" from "v2.0.0")
             val latestVersionCode = parseVersionCode(tagName)
-            val isUpdateAvailable = latestVersionCode > currentVersionCode
+            val currentVersionCodeParsed = parseVersionCode(currentVersionName)
+            val isUpdateAvailable = latestVersionCode > currentVersionCodeParsed
 
             UpdateInfo(
                 latestVersion = tagName,

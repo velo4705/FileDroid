@@ -240,7 +240,7 @@ fun HomeScreen(
                 title = { Text("Update available") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Version ${info.latestVersion} is available. (Current: ${context.packageManager.getPackageInfo(context.packageName, 0).versionName})")
+                        Text("Version ${info.latestVersion.removePrefix("v")} is available. (Current: ${context.packageManager.getPackageInfo(context.packageName, 0).versionName})")
                         if (info.releaseNotes.isNotBlank()) {
                             Text(
                                 info.releaseNotes.take(300),
