@@ -42,8 +42,7 @@ FileDroid is also available on **F-Droid** and **IzzyOnDroid**:
 - **Folder transfer** — upload and download entire folder trees, not just single files
 - **Transfer queue** — live progress, speed indicator, cancel, and retry
 - **Server mode** — run an FTP or SFTP server on your phone so desktop clients (FileZilla, WinSCP, etc.) can connect in
-- **Dual panel** — side-by-side local and remote file browsers with transfer between panels
-- **Relay tunnel** — access your phone's servers from anywhere via a relay server (works over mobile data, no router config needed)
+- **Relay tunnel** — connect two FileDroid instances across any network (WiFi, mobile data, or mixed) via a relay server
 - **In-app update checker** — get notified when new versions are available
 - **SSH terminal** — interactive terminal sessions to remote hosts with ANSI color rendering
 - **Private key auth** — authenticate to SFTP servers using PEM or OpenSSH private keys
@@ -56,8 +55,8 @@ FileDroid is also available on **F-Droid** and **IzzyOnDroid**:
 ## Requirements
 
 - Android 8.0 (API 26) or higher
-- Wi-Fi or local network for server and remote client features
-- Relay tunnel — access your phone's servers over mobile data (relay server included, no config needed)
+- Local network (same Wi-Fi) for direct FTP/SFTP connections
+- Relay tunnel — works over any network including mobile data, no config needed
 
 ---
 
@@ -91,6 +90,8 @@ Ports can be changed in **Settings → Server Ports**.
 ## Connecting to a remote machine from FileDroid
 
 To connect to a machine, you need its **IP address**, **port**, **username**, and **password** (or private key for SFTP). Here's how to find them on each platform.
+
+> **Remote access over mobile data?** Use the **FileDroid Relay Tunnel** — works over any network, no router config needed. See [Remote Access via Relay Tunnel](#remote-access-via-relay-tunnel).
 
 ---
 
@@ -280,7 +281,79 @@ Once you have the details, tap **+** on the Home screen:
 - **Username** — from `whoami` or your system username
 - **Password** — your login password, or leave blank if using a private key
 
-> **Note:** Remote connections require both devices to be on the same local network (same Wi-Fi). For remote access over mobile data, use the **Relay Tunnel** feature — enable it on the host device in Server Control, then connect from the client using the same tunnel ID. The relay URL comes pre-configured; just pick a tunnel ID and go.
+> **Note:** Local network connections require both devices to be on the same Wi-Fi. For remote access over mobile data or across different networks, use the **Relay Tunnel** feature below.
+
+---
+
+## Remote Access via Relay Tunnel
+
+The Relay Tunnel lets two FileDroid instances connect to each other over **any network** — WiFi, mobile data, or a mix of both. No router config, port forwarding, or public IP needed. Works even behind carrier-grade NAT (CGNAT).
+
+### How it works
+
+```
+[Phone A]  ──WebSocket──▶  [Relay Server]  ──WebSocket──▶  [Phone B]
+ (Host)                                              (Client)
+```
+
+1. **Host** starts its FTP/SFTP servers and connects to the relay with a **tunnel ID**
+2. **Client** connects to the same relay with the same **tunnel ID**
+3. The relay bridges TCP traffic between the two devices through WebSocket connections
+
+### Step 1: Host device — start the tunnel
+
+1. Open **Server Control** (from the Home screen or bottom nav)
+2. Make sure your FTP and/or SFTP servers are running
+3. Scroll to the **Relay Tunnel** section
+4. **Relay URL** is pre-configured — no need to change it
+5. Pick a **Tunnel ID** — a unique name both devices will use (e.g. `my-phone`)
+6. Check **Enable relay tunnel** and start the servers
+7. The server will display a **5-word connection code** (e.g. `apple-bright-cloud-river-star`)
+
+> Keep the server and tunnel running on the host device.
+
+### Step 2: Client device — connect to the tunnel
+
+1. From the Home screen, tap **Relay Tunnel** (or navigate to the tunnel screen)
+2. Enter the **5-word connection code** from the host device
+3. Tap **Connect**
+4. Once connected, the tunnel screen shows the local proxy ports for each protocol:
+   - **FTP** → connect to `127.0.0.1` on the shown FTP port
+   - **SFTP** → connect to `127.0.0.1` on the shown SFTP port
+
+### Step 3: Create a connection profile
+
+1. Go to **+** (Add Profile) on the Home screen
+2. Set **Host** to `127.0.0.1`
+3. Set **Port** to the proxy port shown in the tunnel screen (e.g. `2121` for FTP, `2222` for SFTP)
+4. Set **Username** and **Password** to the host device's server credentials
+5. Save and connect
+
+### Connection code sharing
+
+- **Copy** — tap the copy icon to copy the code to clipboard
+- **Share** — tap the share icon to send the code via any app (messaging, email, etc.)
+
+### What works over the tunnel
+
+| Protocol | Works? | Notes |
+|---|---|---|
+| FTP | Yes | Passive mode, data connection relayed automatically |
+| SFTP | Yes | Single connection, works reliably |
+| FTPS | Yes | Explicit and implicit TLS supported |
+
+### Troubleshooting
+
+- **"Connection failed"** — make sure the host device has the tunnel enabled and the relay URL is correct
+- **"Wrong code"** — double-check the 5-word code, words are case-insensitive but spelling must match
+- **Slow transfers** — relay adds latency; for large files, local network (WiFi) is faster when available
+- **Host and client on same mobile carrier** — may not work if the carrier blocks peer connections; try connecting from a different network
+
+---
+
+### In FileDroid (local network)
+
+For devices on the **same Wi-Fi**, you can connect directly without the relay tunnel. Use the host device's local IP address (e.g. `192.168.1.x`) instead of `127.0.0.1`.
 
 ---
 
